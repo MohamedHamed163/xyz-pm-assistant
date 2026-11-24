@@ -3,6 +3,8 @@ import pytest
 from app.documents import (
     CLIENT_SHARED,
     INTERNAL,
+    MANAGEMENT,
+    TEAM,
     DocumentParseError,
     chunk_document,
     parse_document,
@@ -23,7 +25,8 @@ def test_unmarked_sections_default_to_internal(documents):
     brd = next(d for d in documents if d.id == "p001-brd")
     vis = {s.heading: s.visibility for s in brd.sections}
     assert vis["5. Delivery Milestones"] == CLIENT_SHARED
-    assert vis["7. Internal Delivery Risks"] == INTERNAL
+    assert vis["7. Internal Delivery Risks"] == MANAGEMENT
+    assert vis["4. Scope"] == CLIENT_SHARED and INTERNAL == TEAM
 
 
 def test_documents_without_any_markers_are_fully_internal(documents):
@@ -58,7 +61,7 @@ def test_shared_and_internal_text_never_share_a_chunk(documents):
     for chunk in chunk_document(contract, max_chars=5000):  # huge size: would merge if allowed
         has_internal_fact = "USD 352,000" in chunk.text
         if has_internal_fact:
-            assert chunk.visibility == INTERNAL
+            assert chunk.visibility == MANAGEMENT
             assert "USD 486,000" not in chunk.text
 
 
@@ -66,3 +69,15 @@ def test_heading_inside_code_fence_is_not_a_section():
     src = "---\nid: x\ntitle: X\ndoc_type: technical\n---\n## Real\n```\n## not a heading\n```\n"
     doc = parse_document(src)
     assert [s.heading for s in doc.sections] == ["Real"]
+
+
+@pytest.mark.parametrize("marker,expected", [("internal", "team"), ("team", "team"),
+                                             ("management", "management"), ("client_shared", "client_shared")])
+def test_visibility_markers(marker, expected):
+    src = f"---\nid: x\ntitle: X\ndoc_type: brd\n---\n## A <!-- visibility: {marker} -->\ntext\n"
+    assert parse_document(src).sections[0].visibility == expected
+
+
+def test_unmarked_section_is_team():
+    src = "---\nid: x\ntitle: X\ndoc_type: brd\n---\n## A\ntext\n"
+    assert parse_document(src).sections[0].visibility == "team"

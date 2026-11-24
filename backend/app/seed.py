@@ -47,6 +47,7 @@ def load_company(path: Path = SEED_FILE) -> Company:
             scope=spec["scope"],
             doc_types=frozenset(spec["doc_types"]),
             shared_only=bool(spec.get("shared_only", False)),
+            max_visibility=spec.get("max_visibility", "team"),
         )
 
     users = {}
@@ -61,6 +62,7 @@ def load_company(path: Path = SEED_FILE) -> Company:
             user_id=g["user"],
             document_id=g["document"],
             expires_at=datetime.fromisoformat(g["expires_at"]) if g.get("expires_at") else None,
+            max_visibility=g.get("max_visibility", "team"),
         )
         for g in raw.get("grants", [])
     )

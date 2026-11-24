@@ -19,11 +19,11 @@ CANARIES = {
     "15-minute JWT": "P001 tech architecture / auth flow (internal)",
     "Shibboleth": "P002 API docs / auth flow (internal)",
     "2027-02-15": "P001 BRD / milestones (client_shared)",
-    "Project Papyrus": "P001 BRD / internal risks (internal)",
+    "Project Papyrus": "P001 BRD / internal risks (management)",
     "BUG-412": "P001 QA report (internal)",
     "AC-FR-02": "P001 PRD / acceptance criteria (internal)",
     "USD 486,000": "P001 contract / fees (client_shared, restricted doc)",
-    "USD 352,000": "P001 contract / internal negotiation notes (internal, restricted doc)",
+    "USD 352,000": "P001 contract / internal negotiation notes (management, restricted doc)",
     "31.4%": "Company profitability report (restricted, company-wide)",
     "BUG-HD-77": "P003 QA test cases (internal)",
     "LDAP bridge": "P002 BRD internal risks + profitability report",
@@ -32,8 +32,8 @@ CANARIES = {
 # user -> canaries they MUST see. Everything else in CANARIES they must NOT see.
 EXPECTED_VISIBLE = {
     "Hamed":   {"15-minute JWT", "2027-02-15", "Project Papyrus", "BUG-412", "AC-FR-02"},
-    "Sara":    {"15-minute JWT", "2027-02-15", "Project Papyrus", "BUG-412", "AC-FR-02"},
-    "Omar":    {"15-minute JWT", "2027-02-15", "Project Papyrus", "BUG-412", "AC-FR-02"},
+    "Sara":    {"15-minute JWT", "2027-02-15", "BUG-412", "AC-FR-02"},        # team level: no management
+    "Omar":    {"15-minute JWT", "2027-02-15", "BUG-412", "AC-FR-02"},
     "Youssef": {"Shibboleth", "LDAP bridge"},
     "Mona":    set(CANARIES),
     "Amina":   {"2027-02-15", "USD 486,000"},
@@ -176,7 +176,8 @@ def test_sql_for_ceo_is_company_wide_not_a_document_list(company):
     clause, params = build_scope(mona, company.role_policies, company.grants, now=NOW).to_sql()
     assert params["company_wide"] is True
     assert params["granted_document_ids"] == []
-    assert "visibility" not in clause
+    assert params["role_levels"] == ["client_shared", "team", "management"]
+    assert not clause.endswith("AND chunks.visibility = 'client_shared'")   # no client cap
 
 
 def test_sql_values_are_parameters_not_inlined(company):
@@ -185,3 +186,49 @@ def test_sql_values_are_parameters_not_inlined(company):
     clause, params = scope.to_sql()
     assert "DROP TABLE" not in clause
     assert params["company_id"].startswith("xyz'")
+
+
+# --- Section levels -----------------------------------------------------------------------------
+
+def _texts(company, chunks, user, grants=None):
+    u = company.users[user] if user.startswith("u-") else company.user_by_name(user)
+    scope = build_scope(u, company.role_policies, company.grants if grants is None else grants, now=NOW)
+    return "\n".join(c.text for c in filter_chunks(scope, chunks))
+
+
+def test_management_sections_are_hidden_from_developers_and_qa(company, chunks):
+    for name in ("Sara", "Omar"):
+        assert "Project Papyrus" not in _texts(company, chunks, name)
+    assert "Project Papyrus" in _texts(company, chunks, "Hamed")
+
+
+def test_grant_level_limits_what_a_grant_opens(company, chunks):
+    hamed = company.user_by_name("Hamed")
+    team = company.grants + (Grant(hamed.id, "p001-client-contract", max_visibility="team"),)
+    text = _texts(company, chunks, "Hamed", team)
+    # PMs can't read contracts by role, so only the grant applies — and it stops at team.
+    assert "USD 486,000" in text and "USD 352,000" not in text
+    sara = company.user_by_name("Sara")
+    team = company.grants + (Grant(sara.id, "p001-client-contract", max_visibility="team"),)
+    text = _texts(company, chunks, "Sara", team)
+    assert "USD 486,000" in text and "USD 352,000" not in text      # team grant: no negotiation notes
+    shared = company.grants + (Grant(sara.id, "p001-client-contract", max_visibility="client_shared"),)
+    text = _texts(company, chunks, "Sara", shared)
+    assert "1. Parties" in text and "USD 486,000" in text and "USD 352,000" not in text
+
+
+def test_management_grant_never_lifts_the_client_cap(company, chunks):
+    amina = company.user_by_name("Amina")
+    grants = tuple(g for g in company.grants if g.user_id != amina.id) + (
+        Grant(amina.id, "p001-client-contract", max_visibility="management"),
+        Grant(amina.id, "p001-qa-report", max_visibility="management"),
+    )
+    text = _texts(company, chunks, "Amina", grants)
+    assert "USD 486,000" in text and "USD 352,000" not in text and "BUG-412" not in text
+
+
+def test_grant_level_does_not_lower_role_level(company, chunks):
+    """A low-level grant on a document the role already reads must not hide sections."""
+    hamed = company.user_by_name("Hamed")
+    grants = company.grants + (Grant(hamed.id, "p001-brd", max_visibility="client_shared"),)
+    assert "Project Papyrus" in _texts(company, chunks, "Hamed", grants)

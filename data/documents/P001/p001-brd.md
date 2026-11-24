@@ -73,7 +73,7 @@ Post-launch hypercare runs for 30 days after M6.
   to a wallet or bank account.
 - BR-4: Prices shown include 14% VAT.
 
-## 7. Internal Delivery Risks
+## 7. Internal Delivery Risks <!-- visibility: management -->
 
 *Internal — not for client distribution.*
 

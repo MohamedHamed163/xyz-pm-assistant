@@ -47,9 +47,10 @@ def seed_company(conn: psycopg.Connection) -> None:
             )
         for role, spec in raw["role_policy"].items():
             conn.execute(
-                """INSERT INTO roles (name, scope, shared_only) VALUES (%s, %s, %s)
-                   ON CONFLICT (name) DO UPDATE SET scope = EXCLUDED.scope, shared_only = EXCLUDED.shared_only""",
-                (role, spec["scope"], bool(spec.get("shared_only", False))),
+                """INSERT INTO roles (name, scope, shared_only, max_visibility) VALUES (%s, %s, %s, %s)
+                   ON CONFLICT (name) DO UPDATE SET scope = EXCLUDED.scope, shared_only = EXCLUDED.shared_only,
+                     max_visibility = EXCLUDED.max_visibility""",
+                (role, spec["scope"], bool(spec.get("shared_only", False)), spec.get("max_visibility", "team")),
             )
             conn.execute("DELETE FROM role_doc_type_policy WHERE role = %s", (role,))
             for dt in spec["doc_types"]:
@@ -75,10 +76,12 @@ def seed_grants(conn: psycopg.Connection) -> None:
     with conn.transaction():
         for g in raw.get("grants", []):
             conn.execute(
-                """INSERT INTO document_grants (user_id, document_id, granted_by, reason, expires_at)
-                   VALUES (%s, %s, %s, %s, %s)
-                   ON CONFLICT (user_id, document_id) WHERE revoked_at IS NULL DO NOTHING""",
-                (g["user"], g["document"], g.get("granted_by"), g.get("reason"), g.get("expires_at")),
+                """INSERT INTO document_grants (user_id, document_id, granted_by, reason, expires_at, max_visibility)
+                   VALUES (%s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (user_id, document_id) WHERE revoked_at IS NULL
+                   DO UPDATE SET max_visibility = EXCLUDED.max_visibility""",
+                (g["user"], g["document"], g.get("granted_by"), g.get("reason"), g.get("expires_at"),
+                 g.get("max_visibility", "team")),
             )
 
 

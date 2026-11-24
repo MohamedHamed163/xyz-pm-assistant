@@ -3,7 +3,8 @@
 Rules (see docs/design-decisions.md §3):
 - A section starts at every level-2 heading (``## ...``).
 - Visibility is set on the heading line: ``<!-- visibility: client_shared -->``.
-  Unmarked sections are ``internal`` (deny by default). Unknown values fail loudly.
+  Levels: client_shared < team < management. Unmarked sections are ``team`` (never shared with
+  clients by default); the legacy value ``internal`` means ``team``. Unknown values fail loudly.
 - A chunk never crosses a section boundary, so it always inherits exactly one visibility.
 """
 
@@ -15,9 +16,12 @@ from pathlib import Path
 
 import yaml
 
-INTERNAL = "internal"
 CLIENT_SHARED = "client_shared"
-VISIBILITIES = frozenset({INTERNAL, CLIENT_SHARED})
+TEAM = "team"
+MANAGEMENT = "management"
+INTERNAL = TEAM                     # legacy name for the default level
+VISIBILITIES = frozenset({CLIENT_SHARED, TEAM, MANAGEMENT})
+_LEGACY = {"internal": TEAM}
 
 _FRONT_MATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 _VISIBILITY_MARKER = re.compile(r"<!--\s*visibility:\s*([\w-]+)\s*-->")
@@ -128,7 +132,7 @@ def _parse_heading(raw: str, *, doc_id: str) -> tuple[str, str]:
     marker = _VISIBILITY_MARKER.search(raw)
     visibility = INTERNAL
     if marker:
-        visibility = marker.group(1)
+        visibility = _LEGACY.get(marker.group(1), marker.group(1))
         if visibility not in VISIBILITIES:
             raise DocumentParseError(f"{doc_id}: unknown visibility '{visibility}' in heading '{raw}'")
     return _VISIBILITY_MARKER.sub("", raw).strip(), visibility

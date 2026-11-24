@@ -42,13 +42,13 @@ class RetrievalResult:
 
 def load_scope(conn: psycopg.Connection, user_id: str, *, now: datetime | None = None) -> AccessScope:
     row = conn.execute(
-        """SELECT u.name, u.role, u.company_id, u.is_active, r.scope, r.shared_only
+        """SELECT u.name, u.role, u.company_id, u.is_active, r.scope, r.shared_only, r.max_visibility
            FROM users u JOIN roles r ON r.name = u.role WHERE u.id = %s""",
         (user_id,),
     ).fetchone()
     if row is None:
         raise LookupError(f"unknown user {user_id!r}")
-    name, role, company_id, is_active, scope, shared_only = row
+    name, role, company_id, is_active, scope, shared_only, max_visibility = row
     projects = frozenset(r[0] for r in conn.execute(
         "SELECT project_id FROM project_members WHERE user_id = %s", (user_id,)))
     user = User(user_id, name, role, company_id, projects)
@@ -57,13 +57,14 @@ def load_scope(conn: psycopg.Connection, user_id: str, *, now: datetime | None =
     doc_types = frozenset(r[0] for r in conn.execute(
         "SELECT doc_type FROM role_doc_type_policy WHERE role = %s", (role,)))
     grants = [
-        Grant(user_id, doc_id, expires_at)
-        for doc_id, expires_at in conn.execute(
-            "SELECT document_id, expires_at FROM document_grants WHERE user_id = %s AND revoked_at IS NULL",
+        Grant(user_id, doc_id, expires_at, level)
+        for doc_id, expires_at, level in conn.execute(
+            """SELECT document_id, expires_at, max_visibility FROM document_grants
+               WHERE user_id = %s AND revoked_at IS NULL""",
             (user_id,),
         )
     ]
-    policies = {role: RolePolicy(scope, doc_types, shared_only)}
+    policies = {role: RolePolicy(scope, doc_types, shared_only, max_visibility)}
     return build_scope(user, policies, grants, now=now or datetime.now(timezone.utc))
 
 

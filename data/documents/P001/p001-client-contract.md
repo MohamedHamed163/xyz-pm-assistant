@@ -52,7 +52,7 @@ Silence after 10 working days counts as acceptance.
 Source code and IP transfer to the Client upon final payment. Both parties keep each other's information
 confidential for 3 years after termination.
 
-## 7. Internal Negotiation Notes
+## 7. Internal Negotiation Notes <!-- visibility: management -->
 
 *Internal — XYZ Software only. Never share with the client.*
 

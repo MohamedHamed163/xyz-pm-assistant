@@ -33,25 +33,32 @@ doc_types:
 #   scope "assigned": only in projects the user is a member of
 #   scope "company":  every project + company-wide documents
 #   shared_only:      only client_shared sections are ever visible (applies to grants too)
+#   max_visibility:   highest section level visible: client_shared < team < management
 role_policy:
   pm:
     scope: assigned
+    max_visibility: management
     doc_types: [brd, prd, technical, qa, minutes]
   developer:
     scope: assigned
+    max_visibility: team
     doc_types: [brd, prd, technical, qa, minutes]
   qa:
     scope: assigned
+    max_visibility: team
     doc_types: [brd, prd, technical, qa, minutes]
   ceo:
     scope: company
+    max_visibility: management
     doc_types: [brd, prd, technical, qa, minutes, contract, executive_report]
   client:
     scope: assigned
     doc_types: [brd, prd, minutes]
     shared_only: true
+    max_visibility: client_shared
   finance:
     scope: assigned
+    max_visibility: team
     doc_types: []   # access only through explicit grants
 
 users:
@@ -63,20 +70,24 @@ users:
   - { id: u-amina,   name: Amina,   email: amina@nileretail.test, role: client, projects: [P001], organization: Nile Retail Group }
   - { id: u-khaled,  name: Khaled,  email: khaled@xyz.test,  role: finance,   projects: [] }
 
-# Explicit per-document grants. They widen access; they never bypass shared_only.
+# Explicit per-document grants. They widen access up to their own max_visibility (default team);
+# they never bypass shared_only.
 grants:
   - user: u-amina
     document: p001-client-contract
     granted_by: u-mona
     reason: Client signatory — may view their own contract
     expires_at: null
+    max_visibility: client_shared
   - user: u-khaled
     document: p001-client-contract
     granted_by: u-mona
     reason: Invoicing and payment tracking
     expires_at: null
+    max_visibility: management
   - user: u-khaled
     document: company-profitability-2026
     granted_by: u-mona
     reason: Prepares the quarterly portfolio report
     expires_at: null
+    max_visibility: management
