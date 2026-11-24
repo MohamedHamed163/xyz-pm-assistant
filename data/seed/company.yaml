@@ -1,0 +1,73 @@
+# Seed data for the XYZ Software demo.
+# This is the source of truth for the permission tests and, later, the Postgres seed script.
+
+company:
+  id: xyz
+  name: XYZ Software
+
+projects:
+  - { id: P001, name: E-Commerce Platform, client: Nile Retail Group }
+  - { id: P002, name: Droop LMS, client: Delta Academy }
+  - { id: P003, name: Hub Drives, client: Hub Drives Mobility LLC }
+
+# Document types. "restricted" types are CEO-only unless explicitly granted.
+doc_types:
+  brd: { label: Business Requirements Document, restricted: false }
+  prd: { label: Product Requirements Document, restricted: false }
+  technical: { label: Technical Documentation, restricted: false }
+  qa: { label: QA & Testing, restricted: false }
+  minutes: { label: Meeting Minutes & Sprint Reports, restricted: false }
+  contract: { label: Contracts & Commercial, restricted: true }
+  executive_report: { label: Executive Report, restricted: true }
+
+# role -> which doc types it can read, at which scope.
+#   scope "assigned": only in projects the user is a member of
+#   scope "company":  every project + company-wide documents
+#   shared_only:      only client_shared sections are ever visible (applies to grants too)
+role_policy:
+  pm:
+    scope: assigned
+    doc_types: [brd, prd, technical, qa, minutes]
+  developer:
+    scope: assigned
+    doc_types: [brd, prd, technical, qa, minutes]
+  qa:
+    scope: assigned
+    doc_types: [brd, prd, technical, qa, minutes]
+  ceo:
+    scope: company
+    doc_types: [brd, prd, technical, qa, minutes, contract, executive_report]
+  client:
+    scope: assigned
+    doc_types: [brd, prd, minutes]
+    shared_only: true
+  finance:
+    scope: assigned
+    doc_types: []   # access only through explicit grants
+
+users:
+  - { id: u-hamed,   name: Hamed,   email: hamed@xyz.test,   role: pm,        projects: [P001] }
+  - { id: u-sara,    name: Sara,    email: sara@xyz.test,    role: developer, projects: [P001] }
+  - { id: u-omar,    name: Omar,    email: omar@xyz.test,    role: qa,        projects: [P001] }
+  - { id: u-youssef, name: Youssef, email: youssef@xyz.test, role: developer, projects: [P002] }
+  - { id: u-mona,    name: Mona,    email: mona@xyz.test,    role: ceo,       projects: [] }
+  - { id: u-amina,   name: Amina,   email: amina@nileretail.test, role: client, projects: [P001], organization: Nile Retail Group }
+  - { id: u-khaled,  name: Khaled,  email: khaled@xyz.test,  role: finance,   projects: [] }
+
+# Explicit per-document grants. They widen access; they never bypass shared_only.
+grants:
+  - user: u-amina
+    document: p001-client-contract
+    granted_by: u-mona
+    reason: Client signatory — may view their own contract
+    expires_at: null
+  - user: u-khaled
+    document: p001-client-contract
+    granted_by: u-mona
+    reason: Invoicing and payment tracking
+    expires_at: null
+  - user: u-khaled
+    document: company-profitability-2026
+    granted_by: u-mona
+    reason: Prepares the quarterly portfolio report
+    expires_at: null

@@ -1,0 +1,12 @@
+[project]
+name = "xyz-pm-assistant"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6", "psycopg[binary]>=3.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
