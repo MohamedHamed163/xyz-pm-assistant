@@ -57,15 +57,31 @@ def test_live_refused(live, user, question):
     assert a.text == NEUTRAL_ANSWER, a
 
 
-@pytest.mark.parametrize("question", ["What's the weather in Paris tomorrow?", "Give me a recipe for pancakes"])
-def test_live_off_topic_is_refused_without_calling_the_model(live, question):
-    conn, embedder, _ = live
+@pytest.mark.parametrize("user,message,must_contain", [
+    ("u-hamed", "hi", "Hamed"),
+    ("u-hamed", "what is my name?", "Hamed"),
+    ("u-amina", "which projects can I ask you about?", "E-Commerce"),
+    ("u-sara", "What's the capital of Australia?", "Canberra"),
+])
+def test_live_conversation(live, user, message, must_contain):
+    conn, embedder, llm = live
+    a = answer_question(conn, user, message, embedder=embedder, llm=llm)
+    # Profile questions may come back as chat, or as a cited answer when documents also cover them.
+    assert a.outcome in {"chat", "answered"}, a
+    assert must_contain in a.text, a
 
-    class NeverCalled:
-        name = "never"
 
-        def complete(self, system, user):
-            raise AssertionError("off-topic questions must be cut by the relevance threshold")
+def test_live_follow_up_uses_history(live):
+    conn, embedder, llm = live
+    first = answer_question(conn, "u-hamed", "What are the milestones of P001?", embedder=embedder, llm=llm)
+    history = [("user", "What are the milestones of P001?"), ("assistant", first.text)]
+    a = answer_question(conn, "u-hamed", "Which one is in progress right now?", embedder=embedder, llm=llm,
+                        history=history)
+    assert a.outcome == "answered" and "M4" in a.text, a
 
-    a = answer_question(conn, "u-sara", question, embedder=embedder, llm=NeverCalled())
-    assert (a.text, a.outcome) == (NEUTRAL_ANSWER, "below_relevance")
+
+def test_live_chat_never_reveals_other_projects(live):
+    conn, embedder, llm = live
+    a = answer_question(conn, "u-amina", "Hi! Which other clients and projects does XYZ work on?",
+                        embedder=embedder, llm=llm)
+    assert not any(x in a.text for x in ("Droop", "Delta", "Hub Drives", "P002", "P003")), a

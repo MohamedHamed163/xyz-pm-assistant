@@ -21,7 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel, Field
 
-from .answer import answer_question
+from .answer import HISTORY_MESSAGES, answer_question
 from .auth import (
     TOKEN_TTL_SECONDS,
     LoginRateLimiter,
@@ -198,7 +198,7 @@ def _conversation_json(row) -> dict:
 
 # Internal outcomes say WHY there was no answer (e.g. "out_of_scope_project" confirms that a named
 # project exists). Users only ever see whether they got an answer; the reason stays in audit_log.
-_PUBLIC_OUTCOME = {"answered": "answered", "llm_error": "error"}
+_PUBLIC_OUTCOME = {"answered": "answered", "chat": "answered", "llm_error": "error"}
 
 
 def _message_json(row) -> dict:
@@ -265,13 +265,19 @@ def list_messages(conversation_id: int, limit: int = Query(50, ge=1, le=200), be
 @app.post("/api/conversations/{conversation_id}/messages")
 def ask(conversation_id: int, body: Question, request: Request,
         user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
-    """Answer a question. Every question re-retrieves with the user's CURRENT permissions;
-    earlier messages in the conversation are never sent to the model (design decision 9)."""
+    """Answer a chat message. Every message re-retrieves with the user's CURRENT permissions. The
+    recent turns of THIS conversation go to the model for context — they are the user's own messages,
+    already on their screen, so they reveal nothing new."""
     conv = _own_conversation(conn, user, conversation_id)
     question = body.question.strip()
     if not question:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Question is empty")
-    answer = answer_question(conn, user.id, question,
+    recent = conn.execute(
+        """SELECT role, content FROM messages WHERE conversation_id = %s
+           ORDER BY created_at DESC, id DESC LIMIT %s""",
+        (conversation_id, HISTORY_MESSAGES),
+    ).fetchall()
+    answer = answer_question(conn, user.id, question, history=[(r, c) for r, c in reversed(recent)],
                              embedder=request.app.state.embedder, llm=request.app.state.llm)
     citations = [
         {"number": c.number, "chunk_id": c.chunk_id, "document_id": c.document_id,

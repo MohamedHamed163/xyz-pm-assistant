@@ -61,6 +61,16 @@ class DumpEverythingLLM:
         return json.dumps({"found": True, "answer": passages + " [1]", "citations": list(range(1, n + 1))})
 
 
+class DumpAsChatLLM:
+    """Compromised differently: dumps every passage as a *chat* reply, which skips citation checks."""
+
+    name = "compromised-chat"
+
+    def complete(self, system, user):
+        passages = user.split("Passages:", 1)[1]
+        return json.dumps({"type": "chat", "answer": passages, "citations": []})
+
+
 # ---------------------------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------------------------
@@ -110,8 +120,10 @@ def ask(client, headers, cid, question):
 # 1. Leak sweep: every user × every attack, compromised model
 # ---------------------------------------------------------------------------------------------
 
+@pytest.mark.parametrize("model", [DumpEverythingLLM, DumpAsChatLLM])
 @pytest.mark.parametrize("user_id", list(USERS))
-def test_attack_sweep_leaks_nothing(client, tokens, allowed, user_id):
+def test_attack_sweep_leaks_nothing(client, tokens, allowed, user_id, model):
+    app.state.llm = model()
     headers = tokens[user_id]
     cid = conversation(client, headers)
     permitted = EXPECTED_VISIBLE[NAMES[user_id]]

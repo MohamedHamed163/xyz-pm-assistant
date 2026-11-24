@@ -206,7 +206,7 @@ export default function Chat({ me, onLogout }: { me: Me; onLogout: () => void })
           {!loadingThread && messages.length === 0 && !pending && (
             <div className="empty">
               <h2>Hi {me.name}, what do you need to know?</h2>
-              <p className="muted">Answers come only from documents you're allowed to read, with sources.</p>
+              <p className="muted">Chat freely. Facts about your projects come only from documents you're allowed to read, with sources.</p>
               <div className="suggestions">
                 {(SUGGESTIONS[me.role] ?? []).map((s) => (
                   <button key={s} className="suggestion" onClick={() => send(s)}>
@@ -261,7 +261,7 @@ export default function Chat({ me, onLogout }: { me: Me; onLogout: () => void })
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, MAX_QUESTION))}
             onKeyDown={onKeyDown}
-            placeholder="Ask about requirements, architecture, bugs, milestones…"
+            placeholder="Message the assistant — ask about your projects, or just chat…"
             rows={1}
             aria-label="Your question"
             disabled={pending !== null}

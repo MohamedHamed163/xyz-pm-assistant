@@ -108,15 +108,23 @@ may retrieve; every other canary must be invisible.
 
 ## How an answer is produced
 
+The assistant chats like a normal LLM — greetings, "what's my name?", follow-ups, general questions —
+but anything about XYZ (projects, clients, contracts, people, documents) must come from documents
+the user may read, with citations. Each reply is one of: a cited **answer**, a **chat** reply (never
+with sources), or the neutral "couldn't find" sentence.
+
 1. **Project guard** — a question that names only projects the user can't access ("P002", "Droop",
    "Project B") gets the neutral answer. The full pipeline still runs over the user's own content and
    is discarded, so response time can't reveal which names are real projects.
 2. **Retrieve** authorized chunks, narrowed to named projects (+ company-wide docs).
-3. **Relevance cut-off** — nothing close enough → neutral answer, no LLM call.
-4. **Prompt** — passages are wrapped in `<passage>` blocks, declared untrusted data; a passage cannot
-   close its own delimiter.
-5. **Validate** — strict JSON; citation numbers that don't match a passage are dropped; an answer with
-   no valid citation, or with `found=false`, is replaced by the neutral text.
+3. **Relevance cut-off** — only passages close enough to the question are given to the model
+   (for follow-ups, the previous question is included in the search).
+4. **Prompt** — the user's own profile, the last 6 messages of this conversation, and the passages
+   wrapped in `<passage>` blocks declared untrusted data; neither documents nor user text can open
+   or close a prompt block.
+5. **Validate** — strict JSON (`answer` / `chat` / `not_found`); citation numbers that don't match a
+   passage are dropped; an `answer` with no valid citation becomes the neutral text; `chat` replies
+   never show sources.
 6. **Audit** — one row per question: outcome, retrieved chunk ids, cited chunk ids, named projects.
 
 Every refusal path returns the identical sentence, so a refusal never confirms that something exists.
@@ -140,8 +148,6 @@ confirm that a project or document exists.
 
 ## Known limits / next
 
-- Each question is answered on its own: earlier messages are never sent to the model (so permission
-  changes can't leak through history), which also means no "what about the second one?" follow-ups yet.
 - The token is kept in `sessionStorage`; an httpOnly cookie would be stronger against XSS.
 - Document upload has an API (`ingestion.submit_document`) but no UI or upload permissions yet.
 

@@ -248,17 +248,15 @@ def test_offline_answerer_refuses_nonsense(db):
 
 def test_every_refusal_path_returns_the_same_text(db):
     out_of_scope = ask(db, "u-sara", "Droop LMS API endpoints")
-    irrelevant = ask(db, "u-sara", "zebra quantum xylophone", llm=NeverCalledLLM(), max_distance=0.5)
-    not_found = ask(db, "u-sara", "authentication", llm=ScriptedLLM({"found": False, "answer": "", "citations": []}))
-    db.execute("UPDATE users SET is_active = false WHERE id = 'u-omar'")
-    try:
-        nothing = ask(db, "u-omar", "open bugs", llm=NeverCalledLLM())
-    finally:
-        db.execute("UPDATE users SET is_active = true WHERE id = 'u-omar'")
-    assert [a.outcome for a in (out_of_scope, irrelevant, not_found, nothing)] == [
-        "out_of_scope_project", "below_relevance", "not_in_context", "no_authorized_content"]
-    assert {a.text for a in (out_of_scope, irrelevant, not_found, nothing)} == {NEUTRAL_ANSWER}
-    assert all(a.citations == [] for a in (out_of_scope, irrelevant, not_found, nothing))
+    out_of_scope_chatty = ask(db, "u-sara", "Droop LMS API endpoints",
+                              llm=ScriptedLLM({"type": "chat", "answer": "Sure, Droop has 8 endpoints!", "citations": []}))
+    not_found = ask(db, "u-sara", "authentication", llm=ScriptedLLM({"type": "not_found", "answer": "", "citations": []}))
+    nonsense = ask(db, "u-sara", "zebra quantum xylophone")
+    answers = (out_of_scope, out_of_scope_chatty, not_found, nonsense)
+    assert [a.outcome for a in answers] == [
+        "out_of_scope_project", "out_of_scope_project", "not_in_context", "not_in_context"]
+    assert {a.text for a in answers} == {NEUTRAL_ANSWER}
+    assert all(a.citations == [] for a in answers)
 
 
 # --- Audit + citation re-check ------------------------------------------------------------------

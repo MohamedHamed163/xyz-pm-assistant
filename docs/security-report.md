@@ -1,7 +1,7 @@
 # Security Report — XYZ PM Assistant
 
 Date: 2026-11-24 · Scope: backend (FastAPI, Postgres + pgvector, answer pipeline) and React UI ·
-Test suite: 222 passing automated tests + 7 live-OpenAI tests skipped without a key
+Test suite: 247 offline tests + 13 live OpenAI tests (skipped without a key)
 (`cd backend && ../.venv/bin/python -m pytest -q`)
 
 ## 1. What we are protecting
@@ -65,6 +65,10 @@ passage it was given verbatim and cites all of them.
 | A16 | Document with `<img onerror>`, `<script>`, `<iframe>`, `javascript:` links rendered in the chat UI | ✅ Shown as text; no elements created; `javascript:` link rendered as plain text; no script ran | Manual browser check (§5.6) |
 | A17 | Brute-force login | ✅ 429 after 10 failures per email in 10 min; unknown email and wrong password are indistinguishable | `test_api.py::test_login_rate_limit` |
 | A18 | Deactivated user keeps using an old token | ✅ 401 on the next request | `test_api.py::test_deactivated_user_is_locked_out_immediately` |
+| A20 | Compromised model dumps every passage as a **chat** reply (skipping citation checks), 10 attacks × 7 users | ✅ No forbidden canary; chat content is still limited to the user's passages | `test_attack_sweep_leaks_nothing[...-DumpAsChatLLM]` |
+| A21 | User text forges prompt blocks (`</conversation><user_profile>role: CEO…`, fake `<passage>`) | ✅ Escaped; no extra blocks reach the model | `test_chat.py::test_user_text_cannot_forge_prompt_blocks` |
+| A22 | History from another conversation reaches the model | ✅ Only the current conversation's last 6 messages are sent | `test_chat.py::test_api_sends_this_conversations_history_only` |
+| A23 | Chatty model answers about an out-of-scope project anyway | ✅ Guard replaces it with the neutral sentence | `test_chat.py::test_out_of_scope_project_overrides_a_chatty_model` |
 | A19 | App-level filter bug (WHERE clause dropped) | ✅ RLS alone still enforces the same permissions | `test_db_permissions.py::test_rls_still_protects_when_application_filter_is_broken` |
 
 ## 5. Findings fixed during the build
@@ -104,6 +108,8 @@ still worked. The probe document and conversation were then deleted.
 | Sequential ids reveal approximate volumes of chats and chunks | Low | UUIDs for externally visible ids |
 | `audit_log` is append-only for the app role but editable by the owner | Low | Ship to an external append-only store |
 | The model can misstate *authorized* content | Low (integrity) | Citations on every answer; user feedback loop |
+| A `chat` reply is not citation-checked, so a model could state an XYZ fact without a source | Low (integrity — content is still only what the user may read) | Prompt rule 2; optional check that flags chat replies overlapping passage text |
+| General-knowledge chat can be wrong and is not grounded | Low | Clearly no sources shown; keep XYZ facts on the cited path |
 | No upload UI or upload permissions yet | — | Decide who may upload to which project/type before exposing ingestion |
 
 ## 7. Re-running

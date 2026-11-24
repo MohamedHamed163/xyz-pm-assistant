@@ -109,6 +109,18 @@ When a user loses access, old chat history stays visible to them, but every new 
 follow-ups in old chats) re-retrieves with current permissions, and opening an old citation re-checks
 access.
 
+**Updated 2026-11-24 — conversational chat.** The assistant now behaves like a normal chat model:
+- It receives the user's own profile (name, role, readable projects) and the last 6 messages of the
+  *current* conversation, so it can greet, answer "what's my name?", and handle follow-ups.
+- Sending history is safe because it is the user's own conversation, already on their screen; it
+  reveals nothing new. Other conversations are never included.
+- The model replies as `answer` (XYZ facts — citations required and validated), `chat` (no sources;
+  greetings, profile, general knowledge) or `not_found` (the neutral sentence).
+- Retrieval for a follow-up also uses the previous user message, so "and which one is in progress?"
+  finds the milestones again.
+- The project guard and constant-work rule still apply: a message naming only inaccessible projects
+  gets the neutral sentence, whatever the model replies.
+
 ## 10. Authentication
 
 Own login: bcrypt-hashed passwords, 1-hour JWT, "Demo users" switcher on the login page. The backend

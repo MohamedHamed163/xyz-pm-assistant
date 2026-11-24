@@ -1,7 +1,7 @@
 """LLM providers for answer generation.
 
 All providers take the two prompt strings built by ``answer.build_prompt`` and return the raw JSON
-text ``{"found": bool, "answer": str, "citations": [int]}``. Parsing and validation happen in
+text ``{"type": "answer"|"chat"|"not_found", "answer": str, "citations": [int]}``. Parsing and validation happen in
 ``answer.py`` — never trust the provider to format correctly.
 
 - ``OpenAIChatLLM``: OpenAI Chat Completions with a strict JSON schema. Model from OPENAI_MODEL.
@@ -33,11 +33,11 @@ class LLMError(RuntimeError):
 ANSWER_SCHEMA = {
     "type": "object",
     "properties": {
-        "found": {"type": "boolean"},
+        "type": {"type": "string", "enum": ["answer", "chat", "not_found"]},
         "answer": {"type": "string"},
         "citations": {"type": "array", "items": {"type": "integer"}},
     },
-    "required": ["found", "answer", "citations"],
+    "required": ["type", "answer", "citations"],
     "additionalProperties": False,
 }
 
@@ -92,6 +92,9 @@ class ExtractiveLLM:
 
     def complete(self, system: str, user: str) -> str:
         question = user.split("\n", 1)[0].removeprefix("Question: ")
+        chat = _offline_chat(question, _profile(user))
+        if chat:
+            return json.dumps({"type": "chat", "answer": chat, "citations": []})
         keywords = _keywords(_PROJECT_ID.sub(" ", question))
         wanted_projects = {p.upper() for p in _PROJECT_ID.findall(question)}
         needed = 1 if len(keywords) <= 2 else self.min_overlap
@@ -104,17 +107,50 @@ class ExtractiveLLM:
             if score > best_score:
                 best, best_score = (int(pid), doc, section, body, heading_hits), score
         if best is None or best_score < needed:
-            return json.dumps({"found": False, "answer": "", "citations": []})
+            return json.dumps({"type": "not_found", "answer": "", "citations": []})
         pid, doc, section, body, heading_hits = best
         lines = [l.strip() for l in body.splitlines() if l.strip() and not l.startswith(doc)]
         # Heading matched: the whole section is the answer (keeps tables intact). Else pick matching lines.
         relevant = lines if heading_hits else ([l for l in lines if keywords & _keywords(l)] or lines)
         quote = _join_markdown_lines(relevant[: self.max_lines])
         return json.dumps({
-            "found": True,
+            "type": "answer",
             "answer": f"From {doc} — {section} [{pid}]:\n{quote}",
             "citations": [pid],
         })
+
+
+_GREETING = re.compile(r"^\s*(hi|hello|hey|hiya|salam|salaam|good (morning|afternoon|evening)|yo)\b", re.I)
+_THANKS = re.compile(r"\b(thanks|thank you|thx|cheers)\b", re.I)
+_IDENTITY = re.compile(r"\b(my name|who am i|my role|what am i)\b", re.I)
+_ACCESS = re.compile(r"\b(which|what) projects\b.*\b(i|me)\b|\bwhat can i (see|access|ask)\b", re.I)
+_HELP = re.compile(r"^\s*(help|what can you do|how can you help|who are you)\b", re.I)
+
+
+def _profile(user_prompt: str) -> dict[str, str]:
+    block = re.search(r"<user_profile>\n(.*?)\n</user_profile>", user_prompt, re.DOTALL)
+    if not block:
+        return {}
+    return dict(line.split(": ", 1) for line in block.group(1).splitlines() if ": " in line)
+
+
+def _offline_chat(question: str, profile: dict[str, str]) -> str | None:
+    """Canned conversational replies so the offline demo can greet and answer profile questions."""
+    name = profile.get("name", "there")
+    role = profile.get("role", "user")
+    projects = profile.get("projects they can ask about", "your projects")
+    if _IDENTITY.search(question):
+        return f"You're {name}, signed in as {role}. You can ask me about {projects}."
+    if _ACCESS.search(question):
+        return f"You can ask me about {projects}."
+    if _HELP.search(question):
+        return (f"I answer questions about {projects} — requirements, architecture, bugs, milestones and more — "
+                "using only documents you're allowed to read, with sources.")
+    if _GREETING.search(question) and len(_keywords(question)) <= 2:
+        return f"Hi {name}! What would you like to know about {projects}?"
+    if _THANKS.search(question) and len(_keywords(question)) <= 3:
+        return "You're welcome! Anything else?"
+    return None
 
 
 def _join_markdown_lines(lines: list[str]) -> str:
