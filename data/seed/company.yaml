@@ -6,9 +6,18 @@ company:
   name: XYZ Software
 
 projects:
-  - { id: P001, name: E-Commerce Platform, client: Nile Retail Group }
-  - { id: P002, name: Droop LMS, client: Delta Academy }
-  - { id: P003, name: Hub Drives, client: Hub Drives Mobility LLC }
+  - id: P001
+    name: E-Commerce Platform
+    client: Nile Retail Group
+    aliases: [Project A, E-Commerce, Ecommerce, NRG Online, Nile Retail, NRG]
+  - id: P002
+    name: Droop LMS
+    client: Delta Academy
+    aliases: [Project B, Droop, LMS, Delta Academy]
+  - id: P003
+    name: Hub Drives
+    client: Hub Drives Mobility LLC
+    aliases: [Project C, Hub Drives, HubDrives, car rental]
 
 # Document types. "restricted" types are CEO-only unless explicitly granted.
 doc_types:

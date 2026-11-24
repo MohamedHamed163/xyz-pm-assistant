@@ -31,9 +31,10 @@ def seed_company(conn: psycopg.Connection) -> None:
         )
         for p in raw["projects"]:
             conn.execute(
-                """INSERT INTO projects (id, company_id, name, client_name) VALUES (%s, %s, %s, %s)
-                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, client_name = EXCLUDED.client_name""",
-                (p["id"], cid, p["name"], p.get("client")),
+                """INSERT INTO projects (id, company_id, name, client_name, aliases) VALUES (%s, %s, %s, %s, %s)
+                   ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, client_name = EXCLUDED.client_name,
+                     aliases = EXCLUDED.aliases""",
+                (p["id"], cid, p["name"], p.get("client"), p.get("aliases", [])),
             )
         for name, spec in raw["doc_types"].items():
             conn.execute(
