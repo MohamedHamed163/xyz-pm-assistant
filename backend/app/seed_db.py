@@ -14,6 +14,7 @@ import sys
 import psycopg
 import yaml
 
+from .auth import demo_password, hash_password
 from .db import apply_migrations, connect
 from .embeddings import Embedder, default_embedder
 from .ingestion import run_worker_until_empty, submit_document
@@ -24,6 +25,8 @@ def seed_company(conn: psycopg.Connection) -> None:
     load_company()  # validates the YAML (unknown roles, projects, doc types) before touching the DB
     raw = yaml.safe_load(SEED_FILE.read_text(encoding="utf-8"))
     cid = raw["company"]["id"]
+    # All demo users share one demo password (set DEMO_PASSWORD; see .env.example). Hashed once.
+    password_hash = hash_password(demo_password()) if demo_password() else None
     with conn.transaction():
         conn.execute(
             "INSERT INTO companies (id, name) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name",
@@ -58,6 +61,9 @@ def seed_company(conn: psycopg.Connection) -> None:
                      role = EXCLUDED.role, organization = EXCLUDED.organization""",
                 (u["id"], cid, u["name"], u["email"], u["role"], u.get("organization")),
             )
+            if password_hash:
+                conn.execute("UPDATE users SET password_hash = %s WHERE id = %s AND password_hash IS NULL",
+                             (password_hash, u["id"]))
             conn.execute("DELETE FROM project_members WHERE user_id = %s", (u["id"],))
             for pid in u["projects"]:
                 conn.execute("INSERT INTO project_members (user_id, project_id) VALUES (%s, %s)", (u["id"], pid))

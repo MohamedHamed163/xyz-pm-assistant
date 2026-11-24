@@ -109,12 +109,22 @@ class ExtractiveLLM:
         lines = [l.strip() for l in body.splitlines() if l.strip() and not l.startswith(doc)]
         # Heading matched: the whole section is the answer (keeps tables intact). Else pick matching lines.
         relevant = lines if heading_hits else ([l for l in lines if keywords & _keywords(l)] or lines)
-        quote = "\n".join(relevant[: self.max_lines])
+        quote = _join_markdown_lines(relevant[: self.max_lines])
         return json.dumps({
             "found": True,
             "answer": f"From {doc} — {section} [{pid}]:\n{quote}",
             "citations": [pid],
         })
+
+
+def _join_markdown_lines(lines: list[str]) -> str:
+    """Join lines, keeping a blank line wherever a table starts or ends so Markdown doesn't merge them."""
+    out: list[str] = []
+    for line in lines:
+        if out and out[-1].startswith("|") != line.startswith("|"):
+            out.append("")
+        out.append(line)
+    return "\n".join(out)
 
 
 def _keywords(text: str) -> set[str]:
