@@ -130,6 +130,18 @@ request.
 - **First-upload race.** `submit_document` inserts the document row with `ON CONFLICT DO NOTHING`
   *before* `SELECT … FOR UPDATE`, because a row lock cannot protect a row that doesn't exist yet.
 
+## Relevance threshold (measured 2026-11-24)
+
+Closest-chunk cosine distance with `text-embedding-3-small` on the 12 demo documents:
+
+| Question set | Range |
+|--------------|-------|
+| 12 relevant questions (all roles; e.g. "When do I have to pay the second instalment?") | 0.438 – 0.670 |
+| 8 off-topic questions (weather, recipes, jokes, trivia) | 0.860 – 0.956 |
+
+Default `RAG_MAX_DISTANCE = 0.77` sits in the gap, slightly toward recall. Off-topic questions are
+refused without an LLM call. Re-measure as the corpus grows; the gap will narrow.
+
 ## Open risks
 
 - A section wrongly marked `client_shared` will be shown to clients — deny-by-default only covers

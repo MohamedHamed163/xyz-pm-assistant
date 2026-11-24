@@ -55,3 +55,17 @@ def test_live_refused(live, user, question):
     conn, embedder, llm = live
     a = answer_question(conn, user, question, embedder=embedder, llm=llm)
     assert a.text == NEUTRAL_ANSWER, a
+
+
+@pytest.mark.parametrize("question", ["What's the weather in Paris tomorrow?", "Give me a recipe for pancakes"])
+def test_live_off_topic_is_refused_without_calling_the_model(live, question):
+    conn, embedder, _ = live
+
+    class NeverCalled:
+        name = "never"
+
+        def complete(self, system, user):
+            raise AssertionError("off-topic questions must be cut by the relevance threshold")
+
+    a = answer_question(conn, "u-sara", question, embedder=embedder, llm=NeverCalled())
+    assert (a.text, a.outcome) == (NEUTRAL_ANSWER, "below_relevance")

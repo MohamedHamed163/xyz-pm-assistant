@@ -71,8 +71,9 @@ def default_max_distance(embedder: Embedder) -> float:
         return float(os.environ["RAG_MAX_DISTANCE"])
     # Cosine distance. The offline hashing embedder's distances are dominated by hash-collision noise
     # (nonsense scored 0.92, a real question 0.95), so the threshold is disabled for it and the
-    # answerer's own "found" decision is the gate. 0.75 for OpenAI is a starting point to tune.
-    return 2.0 if embedder.name.startswith("hashing") else 0.75
+    # answerer's own "found" decision is the gate. OpenAI: measured 2026-11-24 on the demo corpus,
+    # relevant questions 0.44–0.67, off-topic 0.86–0.96; 0.77 sits in the gap (see design-decisions.md).
+    return 2.0 if embedder.name.startswith("hashing") else 0.77
 
 
 def answer_question(conn: psycopg.Connection, user_id: str, question: str, *, embedder: Embedder,

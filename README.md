@@ -80,7 +80,7 @@ cd backend && ../.venv/bin/python -m app.ask sara "What is the authentication fl
 ```
 
 Environment: `OPENAI_API_KEY` (real embeddings + answers), `OPENAI_MODEL` (default `gpt-4.1-mini`),
-`RAG_MAX_DISTANCE` (relevance cut-off, default 0.75 for OpenAI). Without a key, an offline extractive
+`RAG_MAX_DISTANCE` (relevance cut-off, default 0.77 for OpenAI). Without a key, an offline extractive
 answerer quotes the best-matching passage — no reasoning, but the same permission and citation rules.
 If you switch embedders, re-create the database: OpenAI and offline vectors must not be mixed.
 
@@ -145,8 +145,8 @@ confirm that a project or document exists.
 - The token is kept in `sessionStorage`; an httpOnly cookie would be stronger against XSS.
 - Document upload has an API (`ingestion.submit_document`) but no UI or upload permissions yet.
 
-- The OpenAI path is implemented but has only been exercised by its skipped live test — run
-  `tests/test_live_openai.py` with a key, and tune `RAG_MAX_DISTANCE` on real questions.
+- The live OpenAI suite (`tests/test_live_openai.py`) passes; `RAG_MAX_DISTANCE` was tuned on 20
+  questions of this demo corpus. Re-measure it when the document set grows.
 - The offline embedder is lexical: "timeline" won't find "milestones".
 - RLS evaluates `app_can_read()` per row; fine at demo scale. At millions of chunks, see the scaling
   path in the design doc.
