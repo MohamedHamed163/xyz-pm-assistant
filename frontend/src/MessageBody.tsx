@@ -39,6 +39,8 @@ export function MessageBody({
           </button>
         );
       }
+      // react-markdown blanks unsafe URLs (javascript:, data:, …); show those as plain text.
+      if (!href) return <span>{children}</span>;
       return (
         <a href={href} target="_blank" rel="noopener noreferrer">
           {children}

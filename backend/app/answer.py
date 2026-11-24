@@ -2,8 +2,8 @@
 
 Pipeline:
   1. Load the user's scope from the database.
-  2. Project guard: if the question names only projects the user cannot access → neutral answer,
-     no retrieval, no LLM call. (Same text as "not found", so it confirms nothing.)
+  2. Project guard: if the question names only projects the user cannot access → neutral answer.
+     (Same text as "not found", and the full pipeline still runs so the timing matches too.)
   3. Retrieve authorized chunks (narrowed to the named projects, if any).
   4. Relevance threshold: drop chunks too far from the question. Nothing left → neutral answer.
   5. Build the prompt: passages are delimited and declared to be data, not instructions.
@@ -81,26 +81,37 @@ def answer_question(conn: psycopg.Connection, user_id: str, question: str, *, em
     max_distance = default_max_distance(embedder) if max_distance is None else max_distance
     scope = load_scope(conn, user_id)
 
-    # 2. Project guard.
+    # 2. Project guard. The project list includes projects the user can't see, so the guard must not
+    # change how long a question takes: answering instantly would let a user time responses to learn
+    # which names are real projects (and so which companies are clients). We therefore always run the
+    # full pipeline below — over the user's own content — and discard the result if the guard tripped.
     mentioned = mentioned_projects(conn, scope.company_id, question)
     allowed = accessible_projects(conn, scope)
-    if mentioned and not (mentioned & allowed):
-        return _finish(conn, scope.company_id, user_id, question, "out_of_scope_project",
-                       mentioned=mentioned)
+    out_of_scope = bool(mentioned) and not (mentioned & allowed)
 
-    # 3. Retrieve (audited below, once, with the final outcome).
+    outcome, text, citations, retrieved_ids = _generate(
+        conn, user_id, question, scope, embedder, llm, k=k, max_distance=max_distance,
+        project_filter=(mentioned & allowed) or None,
+    )
+    if out_of_scope:
+        outcome, text, citations = "out_of_scope_project", NEUTRAL_ANSWER, []
+    return _finish(conn, scope.company_id, user_id, question, outcome, retrieved=retrieved_ids,
+                   mentioned=mentioned, text=text, citations=citations)
+
+
+def _generate(conn, user_id, question, scope, embedder, llm, *, k, max_distance, project_filter):
+    """Steps 3–6. Returns (outcome, text, citations, retrieved chunk ids)."""
+    # 3. Retrieve (audited by the caller, once, with the final outcome).
     result = retrieve(conn, user_id, question, embedder, k=k, audit=False, scope=scope,
-                      project_filter=(mentioned & allowed) or None)
+                      project_filter=project_filter)
     retrieved_ids = [c.id for c in result.chunks]
     if not result.chunks:
-        return _finish(conn, scope.company_id, user_id, question, "no_authorized_content",
-                       mentioned=mentioned)
+        return "no_authorized_content", NEUTRAL_ANSWER, [], retrieved_ids
 
     # 4. Relevance threshold.
     passages = [c for c in result.chunks if c.distance <= max_distance]
     if not passages:
-        return _finish(conn, scope.company_id, user_id, question, "below_relevance",
-                       retrieved=retrieved_ids, mentioned=mentioned)
+        return "below_relevance", NEUTRAL_ANSWER, [], retrieved_ids
 
     # 5–6. Generate and validate.
     system, user = build_prompt(question, passages)
@@ -108,16 +119,12 @@ def answer_question(conn: psycopg.Connection, user_id: str, question: str, *, em
         raw = llm.complete(system, user)
         found, text, numbers = parse_llm_output(raw)
     except (LLMError, ValueError):
-        return _finish(conn, scope.company_id, user_id, question, "llm_error",
-                       retrieved=retrieved_ids, mentioned=mentioned, text=ERROR_ANSWER)
+        return "llm_error", ERROR_ANSWER, [], retrieved_ids
 
     text, citations = validate_citations(text, numbers, passages)
     if not found or not citations or not text.strip():
-        return _finish(conn, scope.company_id, user_id, question, "not_in_context",
-                       retrieved=retrieved_ids, mentioned=mentioned)
-
-    return _finish(conn, scope.company_id, user_id, question, "answered", retrieved=retrieved_ids,
-                   mentioned=mentioned, text=text, citations=citations)
+        return "not_in_context", NEUTRAL_ANSWER, [], retrieved_ids
+    return "answered", text, citations, retrieved_ids
 
 
 # ---------------------------------------------------------------------------------------------

@@ -80,11 +80,15 @@ def test_1_sara_p001_auth_flow_is_answered_with_citation(db):
     assert a.citations[0].heading == "2. Authentication Flow"
 
 
-def test_2_sara_p002_question_is_neutral_without_retrieval_or_llm(db):
-    a = ask(db, "u-sara", "What is the authentication flow in P002?", llm=NeverCalledLLM())
+def test_2_sara_p002_question_is_neutral_even_if_the_model_answers(db):
+    # The pipeline runs over Sara's own content (for constant timing); whatever the model says,
+    # the answer is replaced and no P002 content was ever in the prompt.
+    llm = ScriptedLLM({"found": True, "answer": "Here you go [1]", "citations": [1]})
+    a = ask(db, "u-sara", "What is the authentication flow in P002?", llm=llm)
     assert (a.text, a.outcome, a.citations) == (NEUTRAL_ANSWER, "out_of_scope_project", [])
+    assert set(re.findall(r'project="([^"]+)"', llm.prompts[0][1])) <= {"P001"}
     outcome, retrieved, cited, mentioned = last_audit(db, "u-sara")
-    assert (outcome, retrieved, mentioned) == ("out_of_scope_project", [], ["P002"])
+    assert (outcome, cited, mentioned) == ("out_of_scope_project", [], ["P002"])
 
 
 def test_3_hamed_p001_milestones(db):
@@ -243,7 +247,7 @@ def test_offline_answerer_refuses_nonsense(db):
 
 
 def test_every_refusal_path_returns_the_same_text(db):
-    out_of_scope = ask(db, "u-sara", "Droop LMS API endpoints", llm=NeverCalledLLM())
+    out_of_scope = ask(db, "u-sara", "Droop LMS API endpoints")
     irrelevant = ask(db, "u-sara", "zebra quantum xylophone", llm=NeverCalledLLM(), max_distance=0.5)
     not_found = ask(db, "u-sara", "authentication", llm=ScriptedLLM({"found": False, "answer": "", "citations": []}))
     db.execute("UPDATE users SET is_active = false WHERE id = 'u-omar'")

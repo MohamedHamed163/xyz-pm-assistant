@@ -7,6 +7,7 @@ the LLM never receives unauthorized content.
 
 - Business scenario, people, documents, acceptance tests → [docs/business-scenario.md](docs/business-scenario.md)
 - Every design decision and why → [docs/design-decisions.md](docs/design-decisions.md)
+- Threat model, attacks, findings, residual risks → [docs/security-report.md](docs/security-report.md)
 
 ## Status
 
@@ -17,7 +18,7 @@ the LLM never receives unauthorized content.
 | 2 | Postgres + pgvector schema, row-level security, ingestion worker, filtered retrieval | ✅ |
 | 3 | LLM answers with validated citations, project guard, relevance threshold | ✅ |
 | 4 | FastAPI auth, chat history API, React chat UI | ✅ |
-| 5 | Prompt-injection and leak testing end to end | ⏳ next |
+| 5 | End-to-end attack suite + security report | ✅ |
 
 ## Layout
 
@@ -108,7 +109,8 @@ may retrieve; every other canary must be invisible.
 ## How an answer is produced
 
 1. **Project guard** — a question that names only projects the user can't access ("P002", "Droop",
-   "Project B") gets the neutral answer with no retrieval and no LLM call.
+   "Project B") gets the neutral answer. The full pipeline still runs over the user's own content and
+   is discarded, so response time can't reveal which names are real projects.
 2. **Retrieve** authorized chunks, narrowed to named projects (+ company-wide docs).
 3. **Relevance cut-off** — nothing close enough → neutral answer, no LLM call.
 4. **Prompt** — passages are wrapped in `<passage>` blocks, declared untrusted data; a passage cannot
