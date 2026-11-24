@@ -16,7 +16,8 @@ from datetime import datetime
 
 import jwt
 import psycopg
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel, Field
@@ -35,6 +36,10 @@ from .db import default_dsn
 from .embeddings import default_embedder
 from .llm import default_llm
 from .retrieval import accessible_projects, fetch_chunk_for_user, load_scope
+from . import uploads
+from .storage import LocalStorage
+from .uploads import UploadError
+from .worker import start_in_background, worker_in_process
 
 
 @asynccontextmanager
@@ -44,7 +49,13 @@ async def lifespan(app: FastAPI):
     app.state.embedder = getattr(app.state, "embedder", None) or default_embedder()
     app.state.llm = getattr(app.state, "llm", None) or default_llm()
     app.state.login_limiter = LoginRateLimiter()
+    app.state.storage = getattr(app.state, "storage", None) or LocalStorage()
+    stop = None
+    if getattr(app.state, "start_worker", worker_in_process()):
+        stop = start_in_background(app.state.embedder, app.state.storage)
     yield
+    if stop:
+        stop.set()
     app.state.pool.close()
 
 
@@ -155,6 +166,7 @@ def me(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Dep
         "projects": [{"id": p[0], "name": p[1]} for p in projects],
         "company_wide": scope.company_wide,
         "client_view": scope.shared_only,
+        "can_upload": user.role in {"ceo", "pm"},
     }
 
 
@@ -317,3 +329,107 @@ def open_citation(chunk_id: int, user: CurrentUser = Depends(current_user),
     return {"chunk_id": chunk.id, "document_id": chunk.document_id, "document_title": chunk.document_title,
             "project_id": chunk.project_id, "heading": chunk.heading,
             "content": chunk.content.split("\n\n", 1)[-1]}
+
+
+# ---------------------------------------------------------------------------------------------
+# Uploads (CEO and PM) — see uploads.py for the rules
+# ---------------------------------------------------------------------------------------------
+
+def _actor(user: CurrentUser) -> uploads.Actor:
+    return uploads.Actor(user.id, user.role, user.company_id)
+
+
+def _upload_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except UploadError as exc:
+        raise HTTPException(exc.status, exc.message)
+
+
+class SectionEdit(BaseModel):
+    heading: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1)
+    visibility: str
+
+
+class SectionsBody(BaseModel):
+    sections: list[SectionEdit] = Field(min_length=1, max_length=uploads.MAX_SECTIONS)
+
+
+class VisibilityBody(BaseModel):
+    visibility: str
+
+
+@app.get("/api/uploads/options")
+def upload_options(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return uploads.upload_options(conn, _actor(user))
+
+
+@app.post("/api/uploads", status_code=status.HTTP_202_ACCEPTED)
+def create_upload(request: Request, file: UploadFile = File(...), doc_type: str | None = Form(None),
+                  project_id: str | None = Form(None), title: str | None = Form(None),
+                  document_id: str | None = Form(None),
+                  user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > uploads.MAX_UPLOAD_BYTES + 64 * 1024:
+        raise HTTPException(413, "Files can be at most 20 MB.")
+    version_id = _upload_call(
+        uploads.create_upload, conn, request.app.state.storage, _actor(user), file.file, file.filename or "upload",
+        doc_type=doc_type, project_id=project_id or None, title=title, document_id=document_id or None,
+    )
+    return {"id": version_id, "status": "parsing"}
+
+
+@app.get("/api/uploads")
+def list_uploads(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return {"items": uploads.list_uploads(conn, _actor(user))}
+
+
+@app.get("/api/uploads/{version_id}")
+def get_upload(version_id: int, user: CurrentUser = Depends(current_user),
+               conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.get_upload, conn, _actor(user), version_id)
+
+
+@app.put("/api/uploads/{version_id}/sections")
+def save_sections(version_id: int, body: SectionsBody, user: CurrentUser = Depends(current_user),
+                  conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.replace_sections, conn, _actor(user), version_id,
+                        [s.model_dump() for s in body.sections])
+
+
+@app.post("/api/uploads/{version_id}/publish")
+def publish_upload(version_id: int, user: CurrentUser = Depends(current_user),
+                   conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.publish, conn, _actor(user), version_id)
+
+
+@app.post("/api/uploads/{version_id}/discard", status_code=status.HTTP_204_NO_CONTENT)
+def discard_upload(version_id: int, request: Request, user: CurrentUser = Depends(current_user),
+                   conn: psycopg.Connection = Depends(get_conn)):
+    _upload_call(uploads.discard, conn, request.app.state.storage, _actor(user), version_id)
+
+
+@app.get("/api/uploads/{version_id}/file")
+def download_original(version_id: int, request: Request, user: CurrentUser = Depends(current_user),
+                      conn: psycopg.Connection = Depends(get_conn)):
+    """Only the uploader and the CEO: the original contains every section."""
+    path, name = _upload_call(uploads.original_file, conn, request.app.state.storage, _actor(user), version_id)
+    return FileResponse(path, filename=name, media_type="application/octet-stream")
+
+
+@app.get("/api/documents/manage")
+def manageable_documents(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return {"items": uploads.manageable_documents(conn, _actor(user))}
+
+
+@app.patch("/api/documents/{document_id}/sections/{ordinal}")
+def change_visibility(document_id: str, ordinal: int, body: VisibilityBody,
+                      user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.set_live_visibility, conn, _actor(user), document_id, ordinal, body.visibility)
+
+
+@app.post("/api/documents/{document_id}/restore-previous")
+def restore_previous(document_id: str, user: CurrentUser = Depends(current_user),
+                     conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.restore_previous, conn, _actor(user), document_id)

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import psycopg
 
 from .db import to_vector
-from .documents import Chunk, Document, DocumentParseError, chunk_document, parse_document
+from .documents import Chunk, Document, DocumentParseError, Section, chunk_document, parse_document
 from .embeddings import Embedder
 
 MAX_ATTEMPTS = 3
@@ -116,15 +116,20 @@ def run_worker_until_empty(conn: psycopg.Connection, embedder: Embedder) -> list
 
 
 def process_version(conn: psycopg.Connection, version_id: int, embedder: Embedder) -> JobResult:
-    document_id, source_text, attempts, company_id = conn.execute(
-        """SELECT v.document_id, v.source_text, v.attempts, d.company_id
+    document_id, source_text, attempts, company_id, source_kind = conn.execute(
+        """SELECT v.document_id, v.source_text, v.attempts, d.company_id, v.source_kind
            FROM document_versions v JOIN documents d ON d.id = v.document_id WHERE v.id = %s""",
         (version_id,),
     ).fetchone()
 
     # 1. Parse + chunk + embed — slow, network-bound, outside any transaction.
+    #    Markdown sources are parsed here; uploaded files already have reviewed sections in the DB.
+    section_ids = None
     try:
-        doc = parse_document(source_text, company_id=company_id)
+        if source_kind == "markdown":
+            doc = parse_document(source_text, company_id=company_id)
+        else:
+            doc, section_ids = _document_from_sections(conn, version_id)
         chunks = chunk_document(doc)
     except DocumentParseError as exc:
         return _record_failure(conn, version_id, document_id, str(exc), attempts, retryable=False)
@@ -138,12 +143,13 @@ def process_version(conn: psycopg.Connection, version_id: int, embedder: Embedde
     # 2. Swap live — one transaction.
     try:
         with conn.transaction():
-            return _swap_in(conn, version_id, doc, chunks, embeddings)
+            return _swap_in(conn, version_id, doc, chunks, embeddings, section_ids)
     except Exception as exc:
         return _record_failure(conn, version_id, document_id, f"save failed: {exc}", attempts)
 
 
-def _swap_in(conn, version_id: int, doc: Document, chunks: list[Chunk], embeddings) -> JobResult:
+def _swap_in(conn, version_id: int, doc: Document, chunks: list[Chunk], embeddings,
+             section_ids: dict[int, int] | None = None) -> JobResult:
     current_version_id, deleted_at = conn.execute(
         "SELECT current_version_id, deleted_at FROM documents WHERE id = %s FOR UPDATE", (doc.id,)
     ).fetchone()
@@ -160,7 +166,8 @@ def _swap_in(conn, version_id: int, doc: Document, chunks: list[Chunk], embeddin
         )
         return JobResult(version_id, doc.id, "superseded")
 
-    section_ids = _insert_sections(conn, version_id, doc)
+    if section_ids is None:
+        section_ids = _insert_sections(conn, version_id, doc)
     live_status = "deleted" if deleted_at is not None else "ready"
     _insert_chunks(conn, version_id, doc, chunks, embeddings, section_ids, live_status)
 
@@ -178,6 +185,23 @@ def _swap_in(conn, version_id: int, doc: Document, chunks: list[Chunk], embeddin
         (version_id, doc.title, doc.id),
     )
     return JobResult(version_id, doc.id, "ready")
+
+
+def _document_from_sections(conn, version_id: int) -> tuple[Document, dict[int, int]]:
+    """Build a Document from an uploaded version's reviewed sections (already in the DB)."""
+    doc_id, title, project_id, doc_type, company_id = conn.execute(
+        """SELECT d.id, d.title, d.project_id, d.doc_type, d.company_id
+           FROM document_versions v JOIN documents d ON d.id = v.document_id WHERE v.id = %s""",
+        (version_id,),
+    ).fetchone()
+    rows = conn.execute(
+        """SELECT id, ordinal, heading, visibility, content FROM document_sections
+           WHERE version_id = %s ORDER BY ordinal""",
+        (version_id,),
+    ).fetchall()
+    sections = tuple(Section(ordinal, heading, visibility, content) for _, ordinal, heading, visibility, content in rows)
+    doc = Document(doc_id, title, project_id, doc_type, "", company_id=company_id, sections=sections)
+    return doc, {ordinal: sid for sid, ordinal, *_ in rows}
 
 
 def _insert_sections(conn, version_id: int, doc: Document) -> dict[int, int]:

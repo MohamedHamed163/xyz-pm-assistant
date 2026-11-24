@@ -1,10 +1,16 @@
+import os
+import tempfile
 from datetime import datetime, timezone
 
-import pytest
+# Tests drive the workers themselves and must never touch the dev database or real storage.
+os.environ["WORKER_IN_PROCESS"] = "false"
+os.environ["STORAGE_DIR"] = tempfile.mkdtemp(prefix="xyz-test-storage-")
 
-from app.documents import chunk_document, load_documents
-from app.policy import build_scope, filter_chunks
-from app.seed import DOCUMENTS_DIR, load_company
+import pytest  # noqa: E402
+
+from app.documents import chunk_document, load_documents  # noqa: E402
+from app.policy import build_scope, filter_chunks  # noqa: E402
+from app.seed import DOCUMENTS_DIR, load_company  # noqa: E402
 
 NOW = datetime(2026, 11, 24, tzinfo=timezone.utc)
 

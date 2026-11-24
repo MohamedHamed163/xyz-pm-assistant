@@ -46,7 +46,7 @@ backend/tests/                leak grid, acceptance scenarios, DB/RLS equivalenc
 Needs PostgreSQL 16+ with pgvector ≥ 0.8 (`brew install postgresql@17 pgvector`).
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install pyyaml "psycopg[binary]" psycopg_pool fastapi uvicorn pyjwt bcrypt pytest httpx
+python3 -m venv .venv && .venv/bin/pip install pyyaml "psycopg[binary]" psycopg_pool fastapi uvicorn pyjwt bcrypt python-docx pdfplumber python-multipart pytest httpx reportlab
 ```
 
 ```bash
