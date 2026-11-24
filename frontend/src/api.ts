@@ -36,6 +36,68 @@ export interface Me {
   projects: { id: string; name: string }[];
   company_wide: boolean;
   client_view: boolean;
+  can_upload: boolean;
+}
+
+export type Level = "client_shared" | "team" | "management";
+
+export interface UploadOptions {
+  can_upload: boolean;
+  projects: { id: string; name: string }[];
+  company_wide: boolean;
+  doc_types: { name: string; label: string }[];
+}
+
+export interface UploadItem {
+  id: number;
+  title: string;
+  project_id: string | null;
+  doc_type: string;
+  status: "parsing" | "draft" | "processing" | "ready" | "failed" | "superseded";
+  error: string | null;
+  file_name: string;
+  created_at: string;
+  is_new_version: boolean;
+}
+
+export interface DraftSection {
+  ordinal?: number;
+  heading: string;
+  content: string;
+  visibility: Level;
+  changed?: boolean;
+  previous_visibility?: Level | null;
+}
+
+export interface Draft {
+  id: number;
+  document_id: string;
+  status: UploadItem["status"];
+  error: string | null;
+  file_name: string;
+  file_size: number;
+  page_count: number | null;
+  kind: "pdf" | "docx";
+  title: string;
+  project_id: string | null;
+  doc_type: string;
+  is_new_version: boolean;
+  published: boolean;
+  draft_expires_at: string | null;
+  client_name: string | null;
+  sections: DraftSection[];
+  summary: Record<Level, number>;
+}
+
+export interface ManagedDocument {
+  id: string;
+  title: string;
+  project_id: string | null;
+  doc_type: string;
+  updated_at: string;
+  can_restore: boolean;
+  client_name: string | null;
+  sections: { ordinal: number; heading: string; visibility: Level }[];
 }
 
 export interface DemoUser {
@@ -90,7 +152,7 @@ export const setUnauthorizedHandler = (fn: () => void) => (onUnauthorized = fn);
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (typeof init.body === "string") headers.set("Content-Type", "application/json");
   let res: Response;
   try {
     res = await fetch(`/api${path}`, { ...init, headers });
@@ -143,4 +205,42 @@ export const api = {
       { method: "POST", body: JSON.stringify({ question }) },
     ),
   source: (chunkId: number) => request<Source>(`/citations/${chunkId}`),
+
+  uploadOptions: () => request<UploadOptions>("/uploads/options"),
+  createUpload: (file: File, fields: { doc_type?: string; project_id?: string; title?: string; document_id?: string }) => {
+    const form = new FormData();
+    form.append("file", file);
+    for (const [k, v] of Object.entries(fields)) if (v !== undefined) form.append(k, v);
+    return request<{ id: number; status: string }>("/uploads", { method: "POST", body: form });
+  },
+  uploads: () => request<{ items: UploadItem[] }>("/uploads"),
+  upload: (id: number) => request<Draft>(`/uploads/${id}`),
+  saveSections: (id: number, sections: DraftSection[]) =>
+    request<Draft>(`/uploads/${id}/sections`, {
+      method: "PUT",
+      body: JSON.stringify({
+        sections: sections.map(({ heading, content, visibility }) => ({ heading, content, visibility })),
+      }),
+    }),
+  publish: (id: number) =>
+    request<{ status: string; summary: Record<Level, number> }>(`/uploads/${id}/publish`, { method: "POST" }),
+  discard: (id: number) => request<void>(`/uploads/${id}/discard`, { method: "POST" }),
+  downloadOriginal: async (id: number, fileName: string) => {
+    const res = await fetch(`/api/uploads/${id}/file`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new ApiError(res.status, "Download failed");
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: fileName });
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  managedDocuments: () => request<{ items: ManagedDocument[] }>("/documents/manage"),
+  setVisibility: (documentId: string, ordinal: number, visibility: Level) =>
+    request<{ previous: Level }>(`/documents/${encodeURIComponent(documentId)}/sections/${ordinal}`, {
+      method: "PATCH",
+      body: JSON.stringify({ visibility }),
+    }),
+  restorePrevious: (documentId: string) =>
+    request<{ current_version_id: number }>(`/documents/${encodeURIComponent(documentId)}/restore-previous`, {
+      method: "POST",
+    }),
 };

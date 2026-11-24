@@ -142,6 +142,31 @@ request.
 - **First-upload race.** `submit_document` inserts the document row with `ON CONFLICT DO NOTHING`
   *before* `SELECT … FOR UPDATE`, because a row lock cannot protect a row that doesn't exist yet.
 
+## 11. Document upload (PDF / DOCX) — agreed 2026-11-24
+
+| # | Topic | Decision |
+|---|-------|----------|
+| 1 | Section levels | 🟢 `client_shared` < 🔵 `team` (default) < 🔴 `management` |
+| 2 | Sectioning | DOCX heading styles; PDF headings from font size/boldness; one section per page if none; rename/merge/split on review; scanned PDFs rejected; tables → Markdown |
+| 3 | Who uploads | CEO: any type, any project or company-wide. PM: standard types in own projects. Others: none. Backend-enforced |
+| 4 | Flow | upload → `parsing` → `draft` (invisible, all 🔵) → review → publish with summary → `processing` → `ready`. Drafts expire after 7 days |
+| 5 | Level per role | CEO/PM 🔴🔵🟢 · developer/QA 🔵🟢 · client 🟢. Grants carry their own level; the client cap always wins |
+| 6 | Storage | Originals stored by SHA-256 outside the web root; only uploader and CEO can download them |
+| 7 | Limits | 20 MB, 300 pages, 500 sections, 60 s parse timeout, 5 files parsing per user; bulk review actions |
+| 8 | Edge cases | TOC and repeated headers/footers stripped; most frequent heading level is the boundary; re-uploads reuse levels by heading with a "changed" badge; stale-base and permission re-checks at publish |
+| 9 | Fixes | Change a live section's level in one transaction (audited); restore the previous version; zip-bomb limits; isolated parser |
+| 10 | Libraries | `python-docx` + `pdfplumber` (MIT); no PyMuPDF (AGPL) |
+
+Implementation notes:
+- Drafts reuse `document_sections`; RLS only exposes a document's *current* version, and no chunks
+  exist until publish, so drafts cannot reach search.
+- Review may rename, merge and split, but the backend rejects any change to the text itself
+  (the concatenated content must be identical).
+- Merging two sections keeps the *more restrictive* level, so a merge never widens access.
+- `visibility_changes` records every level set at publish, live edit and restore.
+- Parsing and embedding run as separate worker loops (in the API process in dev, or
+  `python -m app.worker`).
+
 ## Relevance threshold (measured 2026-11-24)
 
 Closest-chunk cosine distance with `text-embedding-3-small` on the 12 demo documents:

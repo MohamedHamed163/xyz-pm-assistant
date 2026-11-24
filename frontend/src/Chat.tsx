@@ -10,7 +10,15 @@ type SourceState =
   | { status: "ok"; citation: Citation; source: Source }
   | { status: "gone"; citation: Citation };
 
-export default function Chat({ me, onLogout }: { me: Me; onLogout: () => void }) {
+export default function Chat({
+  me,
+  onLogout,
+  onOpenDocuments,
+}: {
+  me: Me;
+  onLogout: () => void;
+  onOpenDocuments: () => void;
+}) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [convCursor, setConvCursor] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -146,6 +154,11 @@ export default function Chat({ me, onLogout }: { me: Me; onLogout: () => void })
           <button className="btn-primary block" onClick={newChat}>
             + New chat
           </button>
+          {me.can_upload && (
+            <button className="btn-secondary block" onClick={onOpenDocuments}>
+              Documents
+            </button>
+          )}
         </div>
 
         <nav className="conv-list">

@@ -19,6 +19,8 @@ the LLM never receives unauthorized content.
 | 3 | LLM answers with validated citations, project guard, relevance threshold | ✅ |
 | 4 | FastAPI auth, chat history API, React chat UI | ✅ |
 | 5 | End-to-end attack suite + security report | ✅ |
+| 6 | Conversational chat (profile, follow-ups) | ✅ |
+| 7 | PDF/DOCX upload, three section levels, review & publish, live fixes | ✅ |
 
 ## Layout
 
@@ -35,6 +37,10 @@ backend/app/seed_db.py        load the demo company + documents into Postgres
 backend/app/answer.py         project guard → retrieve → relevance cut → prompt → validate citations → audit
 backend/app/llm.py            OpenAI Chat (strict JSON schema), or an offline extractive answerer
 backend/app/ask.py            CLI: ask a question as any demo user
+backend/app/parsing.py        PDF/DOCX → sections, in an isolated process with limits
+backend/app/uploads.py        upload permissions, drafts, review, publish, live level edits, restore
+backend/app/storage.py        original files stored by SHA-256 (local folder; S3 later)
+backend/app/worker.py         separate parse and embed loops
 backend/app/auth.py           bcrypt passwords, 1-hour JWTs, login rate limit
 backend/app/api.py            FastAPI: login, /me, conversations + messages (keyset pages), citation re-check
 frontend/                     React + Vite chat UI: demo-user login, history, citations, source panel
@@ -131,6 +137,25 @@ Every refusal path returns the identical sentence, so a refusal never confirms t
 Tests cover a fully compromised model that dumps its whole prompt: it can only leak what the user
 was already allowed to read.
 
+## Uploading documents
+
+CEO and PMs get a **Documents** button in the chat sidebar:
+
+1. **Upload** a PDF or Word file (new document, or new version of an existing one).
+2. The file is parsed into sections in the background (headings, tables; TOC and footers removed).
+3. **Review**: rename, merge or split sections and choose who sees each one —
+   🟢 Client · 🔵 Team (default) · 🔴 Management. Bulk select, filter and search help with long files.
+4. **Publish** after a summary such as "4 sections visible to the client (Nile Retail Group)".
+5. **Live documents**: change a section's level later (takes effect immediately) or restore the
+   previous version.
+
+| Role | Can upload | Sees |
+|------|------------|------|
+| CEO | any type, any project or company-wide | 🟢🔵🔴 everywhere |
+| PM | BRD/PRD/technical/QA/minutes in own projects | 🟢🔵🔴 in own projects |
+| Developer / QA | — | 🟢🔵 in own projects |
+| Client | — | 🟢 in own project |
+
 ## API
 
 | Method | Path | Notes |
@@ -141,6 +166,15 @@ was already allowed to read.
 | GET/POST/DELETE | `/api/conversations` | own conversations only; keyset pagination (`cursor`) |
 | GET/POST | `/api/conversations/{id}/messages` | POST asks a question; GET pages history (`before`) |
 | GET | `/api/citations/{chunk_id}` | re-checks access when a source is opened; 404 if not readable |
+| GET | `/api/uploads/options` | projects and document types this user may upload to |
+| POST | `/api/uploads` | multipart file + project/type/title (or `document_id` for a new version) → 202 |
+| GET | `/api/uploads`, `/api/uploads/{id}` | my uploads; a draft with its sections |
+| PUT | `/api/uploads/{id}/sections` | save review edits (text must stay identical) |
+| POST | `/api/uploads/{id}/publish`, `/discard` | publish (re-checks permission and base version) or discard |
+| GET | `/api/uploads/{id}/file` | original file — uploader and CEO only |
+| GET | `/api/documents/manage` | live documents this user may manage |
+| PATCH | `/api/documents/{id}/sections/{n}` | change a live section's level (immediate, audited) |
+| POST | `/api/documents/{id}/restore-previous` | make the previous version live again |
 
 The API reports only `answered`, `no_answer` or `error`. Internal outcomes such as
 `out_of_scope_project` stay in `audit_log`, because telling a user *why* there was no answer would
@@ -149,7 +183,6 @@ confirm that a project or document exists.
 ## Known limits / next
 
 - The token is kept in `sessionStorage`; an httpOnly cookie would be stronger against XSS.
-- Document upload has an API (`ingestion.submit_document`) but no UI or upload permissions yet.
 
 - The live OpenAI suite (`tests/test_live_openai.py`) passes; `RAG_MAX_DISTANCE` was tuned on 20
   questions of this demo corpus. Re-measure it when the document set grows.
