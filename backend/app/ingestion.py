@@ -195,11 +195,11 @@ def _document_from_sections(conn, version_id: int) -> tuple[Document, dict[int, 
         (version_id,),
     ).fetchone()
     rows = conn.execute(
-        """SELECT id, ordinal, heading, visibility, content FROM document_sections
+        """SELECT id, ordinal, heading, topic, content FROM document_sections
            WHERE version_id = %s ORDER BY ordinal""",
         (version_id,),
     ).fetchall()
-    sections = tuple(Section(ordinal, heading, visibility, content) for _, ordinal, heading, visibility, content in rows)
+    sections = tuple(Section(ordinal, heading, topic, content) for _, ordinal, heading, topic, content in rows)
     doc = Document(doc_id, title, project_id, doc_type, "", company_id=company_id, sections=sections)
     return doc, {ordinal: sid for sid, ordinal, *_ in rows}
 
@@ -208,9 +208,9 @@ def _insert_sections(conn, version_id: int, doc: Document) -> dict[int, int]:
     ids = {}
     for s in doc.sections:
         (sid,) = conn.execute(
-            """INSERT INTO document_sections (version_id, document_id, ordinal, heading, visibility, content)
+            """INSERT INTO document_sections (version_id, document_id, ordinal, heading, topic, content)
                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id""",
-            (version_id, doc.id, s.ordinal, s.heading, s.visibility, s.content),
+            (version_id, doc.id, s.ordinal, s.heading, s.topic, s.content),
         ).fetchone()
         ids[s.ordinal] = sid
     return ids
@@ -220,11 +220,11 @@ def _insert_chunks(conn, version_id, doc, chunks, embeddings, section_ids, statu
     with conn.cursor() as cur:
         cur.executemany(
             """INSERT INTO chunks (chunk_key, version_id, section_id, document_id, company_id, project_id,
-                                   doc_type, visibility, status, heading, content, token_count, embedding)
+                                   doc_type, topic, status, heading, content, token_count, embedding)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)""",
             [
                 (c.id, version_id, section_ids[c.section_ordinal], c.document_id, c.company_id, c.project_id,
-                 c.doc_type, c.visibility, status, c.heading, c.text, max(1, len(c.text) // 4), to_vector(e))
+                 c.doc_type, c.topic, status, c.heading, c.text, max(1, len(c.text) // 4), to_vector(e))
                 for c, e in zip(chunks, embeddings)
             ],
         )

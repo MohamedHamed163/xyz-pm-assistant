@@ -29,12 +29,12 @@ def new_conn() -> psycopg.Connection:
 
 
 def make_doc(doc_id: str, *, body: str, version: str = "1", project: str = "P001",
-             doc_type: str = "prd", shared: bool = False) -> str:
-    marker = " <!-- visibility: client_shared -->" if shared else ""
+             doc_type: str = "prd", heading: str = "Body") -> str:
+    """A one-section Markdown document. The default heading "Body" matches no topic → unclassified."""
     project_line = f"project: {project}" if project else "project: null"
     return (
         f"---\nid: {doc_id}\ntitle: Test {doc_id}\n{project_line}\ndoc_type: {doc_type}\nversion: \"{version}\"\n---\n"
-        f"# Test {doc_id}\n\n## Body{marker}\n\n{body}\n"
+        f"# Test {doc_id}\n\n## {heading}\n\n{body}\n"
     )
 
 

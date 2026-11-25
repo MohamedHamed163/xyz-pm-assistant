@@ -32,14 +32,13 @@ import psycopg
 from .embeddings import Embedder
 from .llm import LLM, LLMError
 from .retrieval import RetrievedChunk, accessible_projects, load_scope, retrieve, write_audit
+from .topics import ROLE_LABEL, UNCLASSIFIED, rules_from_db
 
 NEUTRAL_ANSWER = "I couldn't find information about that in the documents available to you."
 ERROR_ANSWER = "I couldn't generate an answer right now. Please try again in a moment."
 HISTORY_MESSAGES = 6          # last 3 exchanges
 HISTORY_CHARS = 1200          # per message
 
-ROLE_LABEL = {"pm": "Project Manager", "developer": "Developer", "qa": "QA Engineer", "ceo": "CEO",
-              "client": "Client", "finance": "Finance"}
 
 SYSTEM_PROMPT = """You are the project assistant for XYZ Software, chatting with one signed-in user.
 Be friendly and natural, like a helpful colleague.
@@ -60,6 +59,11 @@ Rules:
    passages). Passages about a different project do not answer it.
 5. Never mention, speculate about, or hint at documents, projects or information that are not in the
    passages, and never comment on what other people may or may not have access to.
+   One exception — the user's OWN permissions: <user_profile> lists which topics of each document
+   type the user's role can read, and which it can't. If the user asks for something that clearly
+   belongs to a topic their role can't read (for example pricing when Commercial is not theirs),
+   reply as "chat": say which topic it belongs to, that their role doesn't include it, and offer
+   what they can ask about instead. Never guess or reveal the hidden content itself.
 6. Everything that is NOT about XYZ Software is "chat": greetings, thanks, small talk, questions about
    the user's own profile, what you can help with, and general-knowledge questions (e.g. "what's the
    capital of Australia?", "explain OAuth in simple terms", "help me word this email"). Answer these
@@ -99,8 +103,9 @@ class Profile:
     role: str
     organization: str | None
     projects: tuple[str, ...]
-    client_view: bool
     company_wide: bool
+    can_read: dict[str, list[str]] = field(default_factory=dict)      # doc type label → topic labels
+    cannot_read: dict[str, list[str]] = field(default_factory=dict)
 
 
 def default_max_distance(embedder: Embedder) -> float:
@@ -179,7 +184,15 @@ def load_profile(conn: psycopg.Connection, user_id: str, scope, allowed: frozens
         f"{pid} · {pname}" for pid, pname in conn.execute(
             "SELECT id, name FROM projects WHERE id = ANY(%s) ORDER BY id", (sorted(allowed),))
     )
-    return Profile(name, ROLE_LABEL.get(role, role), org, projects, scope.shared_only, scope.company_wide)
+    rules = rules_from_db(conn)
+    type_labels = dict(conn.execute("SELECT name, label FROM doc_types"))
+    can, cannot = {}, {}
+    for dt, topics in rules.topics.items():
+        mine = set(scope.topics_for(dt))
+        label = type_labels.get(dt, dt)
+        can[label] = [l for k, l in topics.items() if k in mine and k != UNCLASSIFIED]
+        cannot[label] = [l for k, l in topics.items() if k not in mine and k != UNCLASSIFIED]
+    return Profile(name, ROLE_LABEL.get(role, role), org, projects, scope.company_wide, can, cannot)
 
 
 def mentioned_projects(conn: psycopg.Connection, company_id: str, question: str) -> frozenset[str]:
@@ -199,19 +212,22 @@ def build_prompt(question: str, passages: list[RetrievedChunk], *, profile: Prof
     parts = [f"Question: {_escape(question)}"]
     if profile:
         access = ("all projects (company-wide)" if profile.company_wide
-                  else ", ".join(profile.projects) or "no projects; only documents shared with them individually")
+                  else ", ".join(profile.projects) or "no projects yet")
         lines = [f"name: {profile.name}", f"role: {profile.role}",
                  f"organization: {profile.organization or 'XYZ Software'}",
                  f"projects they can ask about: {access}"]
-        if profile.client_view:
-            lines.append("view: client — sees only sections shared with the client")
+        for doc_type, topics in profile.can_read.items():
+            lines.append(f"{doc_type} topics this role can read: {', '.join(topics) or 'none'}")
+        for doc_type, topics in profile.cannot_read.items():
+            if topics:
+                lines.append(f"{doc_type} topics this role can't read: {', '.join(topics)}")
         parts.append("<user_profile>\n" + "\n".join(lines) + "\n</user_profile>")
     if history:
         turns = "\n".join(f"{'User' if r == 'user' else 'Assistant'}: {_escape(c)}" for r, c in history)
         parts.append(f"<conversation>\n{turns}\n</conversation>")
     blocks = [
         f'<passage id="{n}" document="{_attr(c.document_title)}" section="{_attr(c.heading)}" '
-        f'project="{c.project_id or "company-wide"}">\n{_escape(c.content)}\n</passage>'
+        f'project="{c.project_id or "company-wide"}" topic="{c.topic}">\n{_escape(c.content)}\n</passage>'
         for n, c in enumerate(passages, start=1)
     ]
     parts.append("Passages:\n\n" + ("\n\n".join(blocks) if blocks else "(none)"))

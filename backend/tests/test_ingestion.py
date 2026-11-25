@@ -182,14 +182,14 @@ def test_new_version_cannot_move_project(db):
 
 
 def test_invalid_document_is_rejected_at_upload(db):
-    bad = make_doc("t-bad", body="x").replace("## Body", "## Body <!-- visibility: everyone -->")
+    bad = make_doc("t-bad", body="x").replace("## Body", "## Body <!-- topic: everyone -->")
     with pytest.raises(IngestionError):
         submit_document(db, bad, uploaded_by="u-hamed")
     assert db.execute("SELECT count(*) FROM documents WHERE id = 't-bad'").fetchone()[0] == 0
 
 
 def test_test_documents_never_leak_into_client_view(db):
-    """All test docs above are P001 PRDs with internal sections — Amina must see none of them."""
+    """All test docs above are P001 PRDs with unclassified sections — only CEO/PM may see them."""
     drain(db)
     result = retrieve(db, "u-amina", "content", EMB, k=10_000, audit=False)
     assert not any(c.document_id.startswith("t-") for c in result.chunks)

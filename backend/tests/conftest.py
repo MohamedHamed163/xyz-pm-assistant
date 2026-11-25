@@ -12,7 +12,7 @@ from app.documents import chunk_document, load_documents  # noqa: E402
 from app.policy import build_scope, filter_chunks  # noqa: E402
 from app.seed import DOCUMENTS_DIR, load_company  # noqa: E402
 
-NOW = datetime(2026, 11, 24, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 25, tzinfo=timezone.utc)
 
 
 @pytest.fixture(scope="session")
@@ -32,7 +32,7 @@ def chunks(documents):
 
 @pytest.fixture(scope="session")
 def db():
-    """A fresh test database, migrated and seeded with the demo company and all 12 documents."""
+    """A fresh test database, migrated and seeded with the demo company and the 6 sample documents."""
     from app.embeddings import HashingEmbedder
     from app.seed_db import seed_all
 
@@ -40,8 +40,8 @@ def db():
 
     recreate_test_database()
     conn = new_conn()
-    results = seed_all(conn, HashingEmbedder())
-    assert [r.outcome for r in results] == ["ready"] * 12
+    results = seed_all(conn, HashingEmbedder(), with_documents=True)
+    assert [r.outcome for r in results] == ["ready"] * 6
     yield conn
     conn.close()
 
@@ -52,7 +52,7 @@ def visible_text(company, chunks):
 
     def _visible(name: str) -> str:
         user = company.user_by_name(name)
-        scope = build_scope(user, company.role_policies, company.grants, now=NOW)
+        scope = build_scope(user, company.role_policies)
         return "\n".join(c.text for c in filter_chunks(scope, chunks))
 
     return _visible

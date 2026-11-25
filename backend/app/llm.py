@@ -75,7 +75,7 @@ class OpenAIChatLLM:
 
 
 _PASSAGE = re.compile(
-    r'<passage id="(\d+)" document="([^"]*)" section="([^"]*)" project="([^"]*)">\n(.*?)\n</passage>',
+    r'<passage id="(\d+)" document="([^"]*)" section="([^"]*)" project="([^"]*)"[^>]*>\n(.*?)\n</passage>',
     re.DOTALL,
 )
 _PROJECT_ID = re.compile(r"\bP\d{3}\b", re.IGNORECASE)

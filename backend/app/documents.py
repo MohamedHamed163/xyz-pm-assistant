@@ -1,11 +1,12 @@
-"""Parse source documents into sections and chunks.
+"""Parse Markdown source documents into sections and chunks.
 
-Rules (see docs/design-decisions.md §3):
-- A section starts at every level-2 heading (``## ...``).
-- Visibility is set on the heading line: ``<!-- visibility: client_shared -->``.
-  Levels: client_shared < team < management. Unmarked sections are ``team`` (never shared with
-  clients by default); the legacy value ``internal`` means ``team``. Unknown values fail loudly.
-- A chunk never crosses a section boundary, so it always inherits exactly one visibility.
+Rules:
+- A section starts at every level-2 heading (``## ...``); text before the first one becomes
+  "Introduction" (topic ``details``).
+- Each section gets a TOPIC from its heading keywords (see topics.py). A heading may force one with
+  ``<!-- topic: business_rules -->``; unknown topics fail loudly. Unmatched → ``unclassified``.
+- Lines with a price (currency amount + money word) are split into a separate ``commercial`` section.
+- A chunk never crosses a section boundary, so it always carries exactly one topic.
 """
 
 from __future__ import annotations
@@ -16,15 +17,10 @@ from pathlib import Path
 
 import yaml
 
-CLIENT_SHARED = "client_shared"
-TEAM = "team"
-MANAGEMENT = "management"
-INTERNAL = TEAM                     # legacy name for the default level
-VISIBILITIES = frozenset({CLIENT_SHARED, TEAM, MANAGEMENT})
-_LEGACY = {"internal": TEAM}
+from .topics import DETAILS, TopicRules, clean_markup, classify, default_rules, split_commercial
 
 _FRONT_MATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
-_VISIBILITY_MARKER = re.compile(r"<!--\s*visibility:\s*([\w-]+)\s*-->")
+_TOPIC_MARKER = re.compile(r"<!--\s*topic:\s*([\w-]+)\s*-->")
 
 
 class DocumentParseError(ValueError):
@@ -35,7 +31,7 @@ class DocumentParseError(ValueError):
 class Section:
     ordinal: int
     heading: str
-    visibility: str
+    topic: str
     content: str
 
 
@@ -59,13 +55,18 @@ class Chunk:
     company_id: str
     project_id: str | None
     doc_type: str
-    visibility: str
+    topic: str
     status: str
     heading: str
     text: str
 
+    @property
+    def access_key(self) -> str:
+        return f"{self.doc_type}:{self.topic}"
 
-def parse_document(source: str, *, company_id: str = "xyz") -> Document:
+
+def parse_document(source: str, *, company_id: str = "xyz", rules: TopicRules | None = None) -> Document:
+    rules = rules or default_rules()
     match = _FRONT_MATTER.match(source)
     if not match:
         raise DocumentParseError("missing YAML front matter")
@@ -73,18 +74,21 @@ def parse_document(source: str, *, company_id: str = "xyz") -> Document:
     for key in ("id", "title", "doc_type"):
         if not meta.get(key):
             raise DocumentParseError(f"front matter is missing '{key}'")
+    doc_type = meta["doc_type"]
+    if doc_type not in rules.topics:
+        raise DocumentParseError(f"unknown document type '{doc_type}' (expected one of {sorted(rules.topics)})")
 
-    body = source[match.end():]
-    sections = _split_sections(body, doc_id=meta["id"])
+    raw = _split_sections(clean_markup(source[match.end():]), doc_type=doc_type, doc_id=meta["id"], rules=rules)
+    sections = tuple(Section(n, h, t, c) for n, (h, t, c) in enumerate(split_commercial(raw)))
     return Document(
         id=meta["id"],
         title=meta["title"],
         project_id=meta.get("project"),
-        doc_type=meta["doc_type"],
+        doc_type=doc_type,
         version=str(meta.get("version", "1")),
         company_id=company_id,
         status=meta.get("status", "ready"),
-        sections=tuple(sections),
+        sections=sections,
     )
 
 
@@ -101,9 +105,9 @@ def load_documents(root: Path, *, company_id: str = "xyz") -> list[Document]:
     return docs
 
 
-def _split_sections(body: str, *, doc_id: str) -> list[Section]:
-    sections: list[Section] = []
-    heading, visibility, lines = None, INTERNAL, []
+def _split_sections(body: str, *, doc_type: str, doc_id: str, rules: TopicRules) -> list[tuple[str, str, str]]:
+    sections: list[tuple[str, str, str]] = []
+    heading, topic, lines = None, DETAILS, []
     in_fence = False
 
     def flush() -> None:
@@ -113,14 +117,14 @@ def _split_sections(body: str, *, doc_id: str) -> list[Section]:
             content = "\n".join(l for l in lines if not l.startswith("# ")).strip()
             if not content:
                 return
-        sections.append(Section(len(sections), heading or "Introduction", visibility, content))
+        sections.append((heading or "Introduction", topic, content))
 
     for line in body.splitlines():
         if line.lstrip().startswith("```"):
             in_fence = not in_fence
         if not in_fence and line.startswith("## "):
             flush()
-            heading, visibility = _parse_heading(line[3:], doc_id=doc_id)
+            heading, topic = _parse_heading(line[3:], doc_type=doc_type, doc_id=doc_id, rules=rules)
             lines = []
         else:
             lines.append(line)
@@ -128,14 +132,15 @@ def _split_sections(body: str, *, doc_id: str) -> list[Section]:
     return sections
 
 
-def _parse_heading(raw: str, *, doc_id: str) -> tuple[str, str]:
-    marker = _VISIBILITY_MARKER.search(raw)
-    visibility = INTERNAL
+def _parse_heading(raw: str, *, doc_type: str, doc_id: str, rules: TopicRules) -> tuple[str, str]:
+    heading = _TOPIC_MARKER.sub("", raw).strip()
+    marker = _TOPIC_MARKER.search(raw)
     if marker:
-        visibility = _LEGACY.get(marker.group(1), marker.group(1))
-        if visibility not in VISIBILITIES:
-            raise DocumentParseError(f"{doc_id}: unknown visibility '{visibility}' in heading '{raw}'")
-    return _VISIBILITY_MARKER.sub("", raw).strip(), visibility
+        topic = marker.group(1)
+        if topic not in rules.topics[doc_type]:
+            raise DocumentParseError(f"{doc_id}: unknown topic '{topic}' for {doc_type} in heading '{raw}'")
+        return heading, topic
+    return heading, classify(doc_type, heading, rules)
 
 
 def chunk_document(doc: Document, *, max_chars: int = 1200) -> list[Chunk]:
@@ -154,7 +159,7 @@ def chunk_document(doc: Document, *, max_chars: int = 1200) -> list[Chunk]:
                 company_id=doc.company_id,
                 project_id=doc.project_id,
                 doc_type=doc.doc_type,
-                visibility=section.visibility,
+                topic=section.topic,
                 status=doc.status,
                 heading=section.heading,
                 text=f"{doc.title} — {section.heading}\n\n{piece}",

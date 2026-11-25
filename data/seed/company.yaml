@@ -1,5 +1,8 @@
-# Seed data for the XYZ Software demo.
-# This is the source of truth for the permission tests and, later, the Postgres seed script.
+# Seed data for the XYZ Software demo — the source of truth for the topic rules, users and projects.
+#
+# Access model: role × document type × TOPIC. Sections are tagged with a topic automatically from
+# their heading (topic_headings); a role may read a section only if role_access lists its topic,
+# and only in projects the user is a member of (the CEO reads every project).
 
 company:
   id: xyz
@@ -7,87 +10,191 @@ company:
 
 projects:
   - id: P001
-    name: E-Commerce Platform
-    client: Nile Retail Group
-    aliases: [Project A, E-Commerce, Ecommerce, NRG Online, Nile Retail, NRG]
+    name: Droob AI
+    client: Droob (Business Owner)
+    aliases: [Droob, Droob AI, Project Droob]
   - id: P002
-    name: Droop LMS
-    client: Delta Academy
-    aliases: [Project B, Droop, LMS, Delta Academy]
-  - id: P003
     name: Hub Drives
     client: Hub Drives Mobility LLC
-    aliases: [Project C, Hub Drives, HubDrives, car rental]
+    aliases: [Hub Drives, HubDrives, car rental]
 
-# Document types. "restricted" types are CEO-only unless explicitly granted.
 doc_types:
-  brd: { label: Business Requirements Document, restricted: false }
-  prd: { label: Product Requirements Document, restricted: false }
-  technical: { label: Technical Documentation, restricted: false }
-  qa: { label: QA & Testing, restricted: false }
-  minutes: { label: Meeting Minutes & Sprint Reports, restricted: false }
-  contract: { label: Contracts & Commercial, restricted: true }
-  executive_report: { label: Executive Report, restricted: true }
+  brd: { label: Business Requirements Document }
+  prd: { label: Product Requirements Document }
+  proposal: { label: Proposal }
 
-# role -> which doc types it can read, at which scope.
-#   scope "assigned": only in projects the user is a member of
-#   scope "company":  every project + company-wide documents
-#   shared_only:      only client_shared sections are ever visible (applies to grants too)
-#   max_visibility:   highest section level visible: client_shared < team < management
-role_policy:
-  pm:
-    scope: assigned
-    max_visibility: management
-    doc_types: [brd, prd, technical, qa, minutes]
-  developer:
-    scope: assigned
-    max_visibility: team
-    doc_types: [brd, prd, technical, qa, minutes]
-  qa:
-    scope: assigned
-    max_visibility: team
-    doc_types: [brd, prd, technical, qa, minutes]
+# Topics per document type. Every type also has:
+#   details      — the cover block (version, status, prepared for); harmless metadata
+#   commercial   — prices and payment lines, split out of other sections automatically
+#   unclassified — headings that matched no keyword; CEO/PM only until someone picks a topic
+topics:
+  brd:
+    details: Document details
+    context: Context
+    goals: Goals & objectives
+    requirements: Requirements & scope
+    business_rules: Business rules
+    planning: Planning
+    risks: Risks
+    governance: Governance
+    commercial: Commercial
+    unclassified: Unclassified
+  prd:
+    details: Document details
+    overview: Overview
+    scope: Scope
+    requirements: Requirements
+    delivery: Delivery
+    commercial: Commercial
+    unclassified: Unclassified
+  proposal:
+    details: Document details
+    summary: Summary
+    scope: Scope & deliverables
+    timeline: Timeline
+    commercial: Commercial
+    engagement: Engagement terms
+    completion: Completion & approval
+    unclassified: Unclassified
+
+# Heading keyword → topic. Matched as whole words against the heading with its number removed;
+# longer keywords win ("business rules" beats "rules"). Unmatched headings → unclassified.
+topic_headings:
+  brd:
+    introduction: details
+    document details: details
+    executive summary: context
+    business background: context
+    background: context
+    business problem: context
+    problem: context
+    target users: context
+    proposed business solution: context
+    proposed solution: context
+    solution: context
+    goals: goals
+    objectives: goals
+    success criteria: goals
+    kpis: goals
+    business scope: requirements
+    scope: requirements
+    business requirements: requirements
+    requirements: requirements
+    business process: requirements
+    user journey: requirements
+    business rules: business_rules
+    rules: business_rules
+    policies: business_rules
+    assumptions: planning
+    constraints: planning
+    implementation: planning
+    risks: risks
+    stakeholders: governance
+    sign off: governance
+    future: governance
+    commercial: commercial
+    budget: commercial
+  prd:
+    introduction: details
+    document details: details
+    product overview: overview
+    overview: overview
+    problem statement: overview
+    problem: overview
+    product objectives: overview
+    objectives: overview
+    target users: overview
+    scope: scope
+    functional requirements: requirements
+    non functional requirements: requirements
+    requirements: requirements
+    user flow: requirements
+    user stories: requirements
+    acceptance criteria: requirements
+    success metrics: delivery
+    kpis: delivery
+    metrics: delivery
+    dependencies: delivery
+    risks: delivery
+    release criteria: delivery
+    future enhancements: delivery
+    future: delivery
+    commercial: commercial
+  proposal:
+    introduction: details
+    document details: details
+    executive summary: summary
+    project objectives: summary
+    objectives: summary
+    proposed project scope: scope
+    project scope: scope
+    scope: scope
+    delivery plans: scope
+    deliverables: scope
+    plan: scope
+    timeline: timeline
+    schedule: timeline
+    commercial: commercial
+    payment: commercial
+    pricing: commercial
+    investment: commercial
+    project management: engagement
+    communication: engagement
+    client responsibilities: engagement
+    responsibilities: engagement
+    exclusions: engagement
+    warranty: engagement
+    support: engagement
+    project completion: completion
+    completion: completion
+    approval: completion
+
+# role → scope + topics it may read per document type ("*" = every topic).
+role_access:
   ceo:
     scope: company
-    max_visibility: management
-    doc_types: [brd, prd, technical, qa, minutes, contract, executive_report]
+    topics: { brd: ["*"], prd: ["*"], proposal: ["*"] }
+  pm:
+    scope: assigned
+    topics: { brd: ["*"], prd: ["*"], proposal: ["*"] }
   client:
     scope: assigned
-    doc_types: [brd, prd, minutes]
-    shared_only: true
-    max_visibility: client_shared
+    topics:
+      brd: [details, context, goals, requirements, business_rules, planning, risks, governance, commercial]
+      prd: [details, overview, scope, requirements, delivery, commercial]
+      proposal: [details, summary, scope, timeline, commercial, engagement, completion]
+  developer:
+    scope: assigned
+    topics:
+      brd: [details, context, requirements]
+      prd: [details, overview, scope, requirements, delivery]
+      proposal: [details, scope, timeline]
+  qa:
+    scope: assigned
+    topics:
+      brd: [details, goals, business_rules]
+      prd: [details, overview, scope, requirements, delivery]
+      proposal: [details, scope, completion]
   finance:
     scope: assigned
-    max_visibility: team
-    doc_types: []   # access only through explicit grants
+    topics:
+      brd: [details, goals, commercial]
+      prd: [details, overview, scope, commercial]
+      proposal: [details, summary, scope, timeline, commercial, engagement, completion]
+
+role_labels:
+  ceo: CEO
+  pm: Project Manager
+  developer: Developer
+  qa: QA Engineer
+  finance: Finance Manager
+  client: Client
 
 users:
+  - { id: u-mona,    name: Mona,    email: mona@xyz.test,    role: ceo,       projects: [] }
   - { id: u-hamed,   name: Hamed,   email: hamed@xyz.test,   role: pm,        projects: [P001] }
   - { id: u-sara,    name: Sara,    email: sara@xyz.test,    role: developer, projects: [P001] }
   - { id: u-omar,    name: Omar,    email: omar@xyz.test,    role: qa,        projects: [P001] }
+  - { id: u-khaled,  name: Khaled,  email: khaled@xyz.test,  role: finance,   projects: [P001] }
+  - { id: u-amina,   name: Amina,   email: amina@droob.test, role: client,    projects: [P001], organization: Droob }
   - { id: u-youssef, name: Youssef, email: youssef@xyz.test, role: developer, projects: [P002] }
-  - { id: u-mona,    name: Mona,    email: mona@xyz.test,    role: ceo,       projects: [] }
-  - { id: u-amina,   name: Amina,   email: amina@nileretail.test, role: client, projects: [P001], organization: Nile Retail Group }
-  - { id: u-khaled,  name: Khaled,  email: khaled@xyz.test,  role: finance,   projects: [] }
-
-# Explicit per-document grants. They widen access up to their own max_visibility (default team);
-# they never bypass shared_only.
-grants:
-  - user: u-amina
-    document: p001-client-contract
-    granted_by: u-mona
-    reason: Client signatory — may view their own contract
-    expires_at: null
-    max_visibility: client_shared
-  - user: u-khaled
-    document: p001-client-contract
-    granted_by: u-mona
-    reason: Invoicing and payment tracking
-    expires_at: null
-    max_visibility: management
-  - user: u-khaled
-    document: company-profitability-2026
-    granted_by: u-mona
-    reason: Prepares the quarterly portfolio report
-    expires_at: null
-    max_visibility: management

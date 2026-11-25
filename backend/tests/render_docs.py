@@ -41,7 +41,8 @@ def _blocks(content: str):
         if line.startswith("### "):
             yield "subheading", plain(line[4:])
         elif re.match(r"^\s*([-*]|\d+\.)\s", line):
-            text = re.sub(r"^\s*([-*]|\d+\.)\s+", "", line)
+            number = re.match(r"^\s*(\d+\.)\s", line)          # keep "1." on numbered items
+            text = (number.group(1) + " " if number else "") + re.sub(r"^\s*([-*]|\d+\.)\s+", "", line)
             while i + 1 < len(lines) and lines[i + 1].startswith("  ") and lines[i + 1].strip():
                 i += 1
                 text += " " + lines[i].strip()

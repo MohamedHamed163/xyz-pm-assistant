@@ -36,8 +36,9 @@ from .db import default_dsn
 from .embeddings import default_embedder
 from .llm import default_llm
 from .retrieval import accessible_projects, fetch_chunk_for_user, load_scope
-from . import uploads
+from . import team, uploads
 from .storage import LocalStorage
+from .topics import ROLE_LABEL, rules_from_db
 from .uploads import UploadError
 from .worker import start_in_background, worker_in_process
 
@@ -161,11 +162,14 @@ def me(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Dep
     projects = conn.execute(
         "SELECT id, name FROM projects WHERE id = ANY(%s) ORDER BY id", (project_ids,)
     ).fetchall()
+    labels = rules_from_db(conn).topics
     return {
         **asdict(user),
+        "role_label": ROLE_LABEL.get(user.role, user.role),
         "projects": [{"id": p[0], "name": p[1]} for p in projects],
         "company_wide": scope.company_wide,
-        "client_view": scope.shared_only,
+        # What this role may read, per document type (topic labels) — shown in the UI.
+        "access": {dt: [labels[dt][t] for t in scope.topics_for(dt) if t in labels.get(dt, {})] for dt in labels},
         "can_upload": user.role in {"ceo", "pm"},
     }
 
@@ -349,15 +353,29 @@ def _upload_call(fn, *args, **kwargs):
 class SectionEdit(BaseModel):
     heading: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1)
-    visibility: str
+    topic: str
 
 
 class SectionsBody(BaseModel):
     sections: list[SectionEdit] = Field(min_length=1, max_length=uploads.MAX_SECTIONS)
+    lock_version: int
 
 
-class VisibilityBody(BaseModel):
-    visibility: str
+class TopicBody(BaseModel):
+    topic: str
+
+
+class ProjectBody(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    client: str | None = Field(default=None, max_length=120)
+
+
+class MemberBody(BaseModel):
+    user_id: str
+
+
+class RoleBody(BaseModel):
+    role: str
 
 
 @app.get("/api/uploads/options")
@@ -380,6 +398,12 @@ def create_upload(request: Request, file: UploadFile = File(...), doc_type: str 
     return {"id": version_id, "status": "parsing"}
 
 
+@app.get("/api/uploads/review-requests")
+def review_requests(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    """Drafts in my projects that still have unclassified sections (CEO: every project)."""
+    return {"items": uploads.review_requests(conn, _actor(user))}
+
+
 @app.get("/api/uploads")
 def list_uploads(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
     return {"items": uploads.list_uploads(conn, _actor(user))}
@@ -395,7 +419,7 @@ def get_upload(version_id: int, user: CurrentUser = Depends(current_user),
 def save_sections(version_id: int, body: SectionsBody, user: CurrentUser = Depends(current_user),
                   conn: psycopg.Connection = Depends(get_conn)):
     return _upload_call(uploads.replace_sections, conn, _actor(user), version_id,
-                        [s.model_dump() for s in body.sections])
+                        [s.model_dump() for s in body.sections], body.lock_version)
 
 
 @app.post("/api/uploads/{version_id}/publish")
@@ -424,12 +448,45 @@ def manageable_documents(user: CurrentUser = Depends(current_user), conn: psycop
 
 
 @app.patch("/api/documents/{document_id}/sections/{ordinal}")
-def change_visibility(document_id: str, ordinal: int, body: VisibilityBody,
-                      user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
-    return _upload_call(uploads.set_live_visibility, conn, _actor(user), document_id, ordinal, body.visibility)
+def change_topic(document_id: str, ordinal: int, body: TopicBody,
+                 user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(uploads.set_live_topic, conn, _actor(user), document_id, ordinal, body.topic)
 
 
 @app.post("/api/documents/{document_id}/restore-previous")
 def restore_previous(document_id: str, user: CurrentUser = Depends(current_user),
                      conn: psycopg.Connection = Depends(get_conn)):
     return _upload_call(uploads.restore_previous, conn, _actor(user), document_id)
+
+
+# ---------------------------------------------------------------------------------------------
+# Teams (CEO and PM) — see team.py for the rules
+# ---------------------------------------------------------------------------------------------
+
+@app.get("/api/team")
+def get_team(user: CurrentUser = Depends(current_user), conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(team.team_overview, conn, _actor(user))
+
+
+@app.post("/api/team/projects", status_code=status.HTTP_201_CREATED)
+def create_project(body: ProjectBody, user: CurrentUser = Depends(current_user),
+                   conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(team.create_project, conn, _actor(user), body.name, body.client)
+
+
+@app.post("/api/team/projects/{project_id}/members")
+def add_member(project_id: str, body: MemberBody, user: CurrentUser = Depends(current_user),
+               conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(team.add_member, conn, _actor(user), project_id, body.user_id)
+
+
+@app.delete("/api/team/projects/{project_id}/members/{member_id}")
+def remove_member(project_id: str, member_id: str, user: CurrentUser = Depends(current_user),
+                  conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(team.remove_member, conn, _actor(user), project_id, member_id)
+
+
+@app.patch("/api/team/users/{user_id}/role")
+def change_role(user_id: str, body: RoleBody, user: CurrentUser = Depends(current_user),
+                conn: psycopg.Connection = Depends(get_conn)):
+    return _upload_call(team.change_role, conn, _actor(user), user_id, body.role)

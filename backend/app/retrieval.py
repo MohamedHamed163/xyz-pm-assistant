@@ -17,9 +17,9 @@ import psycopg
 
 from .db import to_vector
 from .embeddings import Embedder
-from .policy import AccessScope, Grant, RolePolicy, User, build_scope
+from .policy import AccessScope, RolePolicy, User, build_scope
 
-_CHUNK_COLUMNS = "c.id, c.chunk_key, c.document_id, c.project_id, c.heading, c.content"
+_CHUNK_COLUMNS = "c.id, c.chunk_key, c.document_id, c.project_id, c.heading, c.content, c.doc_type, c.topic"
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,8 @@ class RetrievedChunk:
     heading: str
     content: str
     distance: float
+    doc_type: str = ""
+    topic: str = ""
 
 
 @dataclass(frozen=True)
@@ -42,42 +44,31 @@ class RetrievalResult:
 
 def load_scope(conn: psycopg.Connection, user_id: str, *, now: datetime | None = None) -> AccessScope:
     row = conn.execute(
-        """SELECT u.name, u.role, u.company_id, u.is_active, r.scope, r.shared_only, r.max_visibility
+        """SELECT u.name, u.role, u.company_id, u.is_active, r.scope
            FROM users u JOIN roles r ON r.name = u.role WHERE u.id = %s""",
         (user_id,),
     ).fetchone()
     if row is None:
         raise LookupError(f"unknown user {user_id!r}")
-    name, role, company_id, is_active, scope, shared_only, max_visibility = row
+    name, role, company_id, is_active, scope = row
     projects = frozenset(r[0] for r in conn.execute(
         "SELECT project_id FROM project_members WHERE user_id = %s", (user_id,)))
     user = User(user_id, name, role, company_id, projects)
     if not is_active:
         return AccessScope.deny_all(user)
-    doc_types = frozenset(r[0] for r in conn.execute(
-        "SELECT doc_type FROM role_doc_type_policy WHERE role = %s", (role,)))
-    grants = [
-        Grant(user_id, doc_id, expires_at, level)
-        for doc_id, expires_at, level in conn.execute(
-            """SELECT document_id, expires_at, max_visibility FROM document_grants
-               WHERE user_id = %s AND revoked_at IS NULL""",
-            (user_id,),
-        )
-    ]
-    policies = {role: RolePolicy(scope, doc_types, shared_only, max_visibility)}
-    return build_scope(user, policies, grants, now=now or datetime.now(timezone.utc))
+    keys = frozenset(f"{dt}:{t}" for dt, t in conn.execute(
+        "SELECT doc_type, topic FROM role_topic_access WHERE role = %s", (role,)))
+    return build_scope(user, {role: RolePolicy(scope, keys)})
 
 
 def accessible_projects(conn: psycopg.Connection, scope: AccessScope) -> frozenset[str]:
-    """Projects the user can read anything in: assigned projects + projects of granted documents."""
+    """Projects the user can read anything in."""
+    if not scope.access_keys:
+        return frozenset()
     if scope.company_wide:
         return frozenset(r[0] for r in conn.execute(
             "SELECT id FROM projects WHERE company_id = %s", (scope.company_id,)))
-    granted = {r[0] for r in conn.execute(
-        "SELECT project_id FROM documents WHERE id = ANY(%s) AND project_id IS NOT NULL",
-        (sorted(scope.granted_document_ids),),
-    )}
-    return frozenset(scope.project_ids | granted) if scope.doc_types else frozenset(granted)
+    return scope.project_ids
 
 
 def retrieve(conn: psycopg.Connection, user_id: str, query: str, embedder: Embedder, *, k: int = 8,
@@ -145,7 +136,7 @@ def _with_titles(conn: psycopg.Connection, rows) -> list[RetrievedChunk]:
         "SELECT id, title FROM documents WHERE id = ANY(%s)", (list({r[2] for r in rows}),)
     ).fetchall())
     return [
-        RetrievedChunk(r[0], r[1], r[2], r[3], titles.get(r[2], r[2]), r[4], r[5], float(r[6]))
+        RetrievedChunk(r[0], r[1], r[2], r[3], titles.get(r[2], r[2]), r[4], r[5], float(r[8]), r[6], r[7])
         for r in rows
     ]
 

@@ -2,7 +2,7 @@
 
 Uses its own database (separate embeddings), so it never mixes OpenAI and hashing vectors.
 
-    OPENAI_API_KEY=... ../.venv/bin/python -m pytest -q tests/test_live_openai.py
+    ../.venv/bin/python -m pytest -q tests/test_live_openai.py
 """
 
 import os
@@ -28,60 +28,65 @@ def live():
         admin.execute('CREATE DATABASE "xyz_pm_live_test"')
     conn = psycopg.connect(LIVE_DSN, autocommit=True)
     embedder, llm = OpenAIEmbedder(), OpenAIChatLLM()
-    seed_all(conn, embedder)
+    seed_all(conn, embedder, with_documents=True)
     yield conn, embedder, llm
     conn.close()
 
 
+def ask(live, user, question, **kw):
+    conn, embedder, llm = live
+    return answer_question(conn, user, question, embedder=embedder, llm=llm, **kw)
+
+
 @pytest.mark.parametrize("user,question,expect_doc", [
-    ("u-sara", "What is the authentication flow in our application?", "p001-tech-architecture"),
-    ("u-hamed", "What are the milestones of P001?", "p001-brd"),
-    ("u-mona", "What is the financial performance of all projects?", "company-profitability-2026"),
-    ("u-amina", "What is the project delivery timeline?", "p001-brd"),
+    ("u-omar", "What are the business rules of Droob AI?", "droob-brd"),
+    ("u-omar", "When is the Droob project considered complete?", "droob-proposal"),
+    ("u-sara", "How long will the project take?", "droob-proposal"),
+    ("u-khaled", "What are the payment terms?", "droob-proposal"),
+    ("u-amina", "What are the business goals?", "droob-brd"),
+    ("u-youssef", "What are the business rules for renters?", "hub-brd"),
 ])
 def test_live_answered(live, user, question, expect_doc):
-    conn, embedder, llm = live
-    a = answer_question(conn, user, question, embedder=embedder, llm=llm)
+    a = ask(live, user, question)
     assert a.outcome == "answered", a
     assert expect_doc in {c.document_id for c in a.citations}
 
 
-@pytest.mark.parametrize("user,question", [
-    ("u-sara", "What is the authentication flow in P002?"),
-    ("u-hamed", "What is the contract payment amount of P001?"),
-    ("u-amina", "What are the internal QA issues?"),
-])
-def test_live_refused(live, user, question):
-    conn, embedder, llm = live
-    a = answer_question(conn, user, question, embedder=embedder, llm=llm)
-    assert a.text == NEUTRAL_ANSWER, a
+def test_live_qa_asking_for_prices_gets_the_rule_not_the_price(live):
+    a = ask(live, "u-omar", "How much does Plan 2 cost?")
+    assert "$" not in a.text and "1,000" not in a.text, a
+    assert a.outcome in {"chat", "not_in_context"}, a
+    if a.outcome == "chat":
+        assert "commercial" in a.text.lower(), a          # the rule is explained
+
+
+def test_live_developer_asking_for_business_rules_gets_the_rule(live):
+    a = ask(live, "u-sara", "What are the business rules?")
+    assert "authenticated users" not in a.text.lower() and a.citations == [], a
+
+
+def test_live_other_project_is_neutral(live):
+    assert ask(live, "u-youssef", "What are Droob AI's business goals?").text == NEUTRAL_ANSWER
 
 
 @pytest.mark.parametrize("user,message,must_contain", [
     ("u-hamed", "hi", "Hamed"),
     ("u-hamed", "what is my name?", "Hamed"),
-    ("u-amina", "which projects can I ask you about?", "E-Commerce"),
     ("u-sara", "What's the capital of Australia?", "Canberra"),
 ])
 def test_live_conversation(live, user, message, must_contain):
-    conn, embedder, llm = live
-    a = answer_question(conn, user, message, embedder=embedder, llm=llm)
-    # Profile questions may come back as chat, or as a cited answer when documents also cover them.
-    assert a.outcome in {"chat", "answered"}, a
-    assert must_contain in a.text, a
+    a = ask(live, user, message)
+    assert a.outcome in {"chat", "answered"} and must_contain in a.text, a
 
 
 def test_live_follow_up_uses_history(live):
-    conn, embedder, llm = live
-    first = answer_question(conn, "u-hamed", "What are the milestones of P001?", embedder=embedder, llm=llm)
-    history = [("user", "What are the milestones of P001?"), ("assistant", first.text)]
-    a = answer_question(conn, "u-hamed", "Which one is in progress right now?", embedder=embedder, llm=llm,
-                        history=history)
-    assert a.outcome == "answered" and "M4" in a.text, a
+    first = ask(live, "u-omar", "What are the business rules?")
+    a = ask(live, "u-omar", "Which of those is about document processing?",
+            history=[("user", "What are the business rules?"), ("assistant", first.text)])
+    assert a.outcome == "answered" and "process" in a.text.lower(), a
 
 
-def test_live_chat_never_reveals_other_projects(live):
-    conn, embedder, llm = live
-    a = answer_question(conn, "u-amina", "Hi! Which other clients and projects does XYZ work on?",
-                        embedder=embedder, llm=llm)
-    assert not any(x in a.text for x in ("Droop", "Delta", "Hub Drives", "P002", "P003")), a
+@pytest.mark.parametrize("question", ["What's the weather in Paris tomorrow?", "Give me a recipe for pancakes"])
+def test_live_off_topic_is_chat_without_sources(live, question):
+    a = ask(live, "u-sara", question)
+    assert a.citations == [] and a.outcome in {"chat", "not_in_context"}, a

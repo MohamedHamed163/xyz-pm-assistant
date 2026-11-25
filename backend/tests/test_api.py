@@ -39,7 +39,7 @@ def sara(client):
 
 @pytest.fixture(scope="module")
 def amina(client):
-    return login(client, "amina@nileretail.test")
+    return login(client, "amina@droob.test")
 
 
 def new_conversation(client, headers):
@@ -103,36 +103,37 @@ def test_demo_users_list(client):
 def test_me_reflects_role_and_projects(client, sara, amina):
     s = client.get("/api/me", headers=sara).json()
     a = client.get("/api/me", headers=amina).json()
-    assert (s["role"], [p["id"] for p in s["projects"]], s["client_view"]) == ("developer", ["P001"], False)
-    assert (a["role"], [p["id"] for p in a["projects"]], a["client_view"]) == ("client", ["P001"], True)
+    assert (s["role"], s["role_label"], [p["id"] for p in s["projects"]]) == ("developer", "Developer", ["P001"])
+    assert (a["role"], [p["id"] for p in a["projects"]]) == ("client", ["P001"])
+    assert "Business rules" not in s["access"]["brd"] and "Requirements & scope" in s["access"]["brd"]
     mona = client.get("/api/me", headers=login(client, "mona@xyz.test")).json()
-    assert mona["company_wide"] and len(mona["projects"]) == 3
+    assert mona["company_wide"] and len(mona["projects"]) == 2
 
 
 # --- Conversations ------------------------------------------------------------------------------
 
 def test_ask_stores_both_messages_with_citations(client, sara):
     cid = new_conversation(client, sara)
-    answer = ask(client, sara, cid, "What is the authentication flow in P001?")
+    answer = ask(client, sara, cid, "What are the business requirements?")
     assert answer["outcome"] == "answered"
-    assert answer["citations"][0]["document_id"] == "p001-tech-architecture"
+    assert answer["citations"][0]["document_id"] == "droob-brd"
     msgs = client.get(f"/api/conversations/{cid}/messages", headers=sara).json()["items"]
     assert [m["role"] for m in msgs] == ["user", "assistant"]
     assert msgs[1]["citations"] == answer["citations"]
     title = client.get("/api/conversations", headers=sara).json()["items"][0]["title"]
-    assert title.startswith("What is the authentication flow")
+    assert title.startswith("What are the business requirements")
 
 
 def test_refusal_is_stored_as_neutral(client, sara):
     cid = new_conversation(client, sara)
-    answer = ask(client, sara, cid, "What is the authentication flow in P002?")
+    answer = ask(client, sara, cid, "What is the Hub Drives scope?")
     assert (answer["content"], answer["outcome"], answer["citations"]) == (NEUTRAL, "no_answer", [])
 
 
 def test_api_never_reveals_why_there_was_no_answer(client, amina, db):
-    """'out_of_scope_project' would confirm that Droop is a project. Users see only 'no_answer'."""
+    """'out_of_scope_project' would confirm that Hub Drives is a project. Users see only 'no_answer'."""
     cid = new_conversation(client, amina)
-    out_of_scope = ask(client, amina, cid, "What is the Droop LMS budget?")
+    out_of_scope = ask(client, amina, cid, "What is the Hub Drives budget?")
     not_found = ask(client, amina, cid, "zebra quantum xylophone")
     assert out_of_scope == {**out_of_scope, "outcome": "no_answer", "content": NEUTRAL}
     assert not_found == {**not_found, "outcome": "no_answer", "content": NEUTRAL}
@@ -143,7 +144,7 @@ def test_api_never_reveals_why_there_was_no_answer(client, amina, db):
 
 def test_other_users_conversation_is_invisible(client, sara, amina):
     cid = new_conversation(client, sara)
-    ask(client, sara, cid, "What is the authentication flow in P001?")
+    ask(client, sara, cid, "What are the business requirements?")
     assert client.get(f"/api/conversations/{cid}/messages", headers=amina).status_code == 404
     r = client.post(f"/api/conversations/{cid}/messages", json={"question": "hi"}, headers=amina)
     assert r.status_code == 404
@@ -203,11 +204,14 @@ def test_invalid_cursor_is_400(client, sara):
 
 def test_open_citation_rechecks_access(client, sara, amina):
     cid = new_conversation(client, sara)
-    chunk_id = ask(client, sara, cid, "What is the authentication flow in P001?")["citations"][0]["chunk_id"]
+    chunk_id = ask(client, sara, cid, "What are the business requirements?")["citations"][0]["chunk_id"]
     r = client.get(f"/api/citations/{chunk_id}", headers=sara)
-    assert r.status_code == 200 and "Argon2id" in r.json()["content"]
-    denied = client.get(f"/api/citations/{chunk_id}", headers=amina)
-    missing = client.get("/api/citations/99999999", headers=amina)
+    assert r.status_code == 200 and "BR-01" in r.json()["content"]
+    youssef = login(client, "youssef@xyz.test")                     # other project
+    omar = login(client, "omar@xyz.test")                           # QA: BRD requirements aren't theirs
+    assert client.get(f"/api/citations/{chunk_id}", headers=omar).status_code == 404
+    denied = client.get(f"/api/citations/{chunk_id}", headers=youssef)
+    missing = client.get("/api/citations/99999999", headers=youssef)
     assert denied.status_code == missing.status_code == 404 and denied.json() == missing.json()
 
 
@@ -215,11 +219,11 @@ def test_moved_user_keeps_history_but_gets_nothing_new(client, db):
     """Design decision 9: history stays; new questions and citation opens use current permissions."""
     headers = login(client, "hamed@xyz.test")
     cid = new_conversation(client, headers)
-    before = ask(client, headers, cid, "What are the milestones of P001?")
+    before = ask(client, headers, cid, "What are the Droob business rules?")
     assert before["outcome"] == "answered"
     db.execute("UPDATE project_members SET project_id = 'P002' WHERE user_id = 'u-hamed'")
     try:
-        after = ask(client, headers, cid, "What are the milestones of P001?")
+        after = ask(client, headers, cid, "What are the Droob business rules?")
         assert (after["content"], after["outcome"]) == (NEUTRAL, "no_answer")
         history = client.get(f"/api/conversations/{cid}/messages", headers=headers).json()["items"]
         assert history[1]["outcome"] == "answered"                     # old answer still visible

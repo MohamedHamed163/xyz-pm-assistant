@@ -46,13 +46,13 @@ def test_round_trip(rendered, doc, kind):
 
 def test_tables_survive_as_markdown(rendered):
     for kind in ("docx", "pdf"):
-        parsed = parse_file(rendered[("p001-brd", kind)], kind)
-        milestones = next(s for s in parsed.sections if s.heading == "5. Delivery Milestones")
-        assert re.search(r"^\| *M6 *\| *Go-live", milestones.content, re.M), kind
+        parsed = parse_file(rendered[("droob-proposal", kind)], kind)
+        commercial = next(s for s in parsed.sections if s.heading == "6. Commercial Proposal")
+        assert re.search(r"^\| *Plan 2 *\| *\$1,000 *\|", commercial.content, re.M), kind
 
 
 def test_isolated_parse_matches_in_process(rendered):
-    path = rendered[("p001-qa-report", "pdf")]
+    path = rendered[("droob-prd", "pdf")]
     assert parse_file_isolated(path, "pdf").sections == parse_file(path, "pdf").sections
 
 
@@ -148,4 +148,4 @@ def test_corrupt_pdf_gives_a_clear_error(tmp_path):
 
 def test_parser_timeout_is_enforced(tmp_path, rendered):
     with pytest.raises(ParseError, match="longer than"):
-        parse_file_isolated(rendered[("p001-brd", "pdf")], "pdf", timeout=0.01)
+        parse_file_isolated(rendered[("droob-brd", "pdf")], "pdf", timeout=0.01)

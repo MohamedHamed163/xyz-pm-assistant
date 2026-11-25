@@ -1,44 +1,68 @@
 import pytest
 
-from app.documents import (
-    CLIENT_SHARED,
-    INTERNAL,
-    MANAGEMENT,
-    TEAM,
-    DocumentParseError,
-    chunk_document,
-    parse_document,
-)
+from app.documents import DocumentParseError, chunk_document, parse_document
+from app.topics import classify, is_money_line, split_commercial
 
 
-def test_all_demo_documents_load(documents):
-    assert len(documents) == 12
-    assert {d.doc_type for d in documents} == {"brd", "prd", "technical", "qa", "contract", "executive_report"}
+def test_sample_corpus_loads(documents):
+    assert len(documents) == 6
+    assert {d.doc_type for d in documents} == {"brd", "prd", "proposal"}
+    assert {d.project_id for d in documents} == {"P001", "P002"}
 
 
-def test_company_wide_report_has_no_project(documents):
-    report = next(d for d in documents if d.id == "company-profitability-2026")
-    assert report.project_id is None
+def test_no_sample_section_is_unclassified(documents):
+    assert not [(d.id, s.heading) for d in documents for s in d.sections if s.topic == "unclassified"]
 
 
-def test_unmarked_sections_default_to_internal(documents):
-    brd = next(d for d in documents if d.id == "p001-brd")
-    vis = {s.heading: s.visibility for s in brd.sections}
-    assert vis["5. Delivery Milestones"] == CLIENT_SHARED
-    assert vis["7. Internal Delivery Risks"] == MANAGEMENT
-    assert vis["4. Scope"] == CLIENT_SHARED and INTERNAL == TEAM
+@pytest.mark.parametrize("doc_type,heading,topic", [
+    ("brd", "11. Business Rules", "business_rules"),
+    ("brd", "4. Business Goals & Objectives", "goals"),
+    ("brd", "17. Business Acceptance / Sign-Off", "governance"),
+    ("brd", "10. Business Process / High-Level User Journey", "requirements"),
+    ("prd", "9. Non-Functional Requirements", "requirements"),
+    ("prd", "13. MVP Release Criteria", "delivery"),
+    ("proposal", "4. Project Delivery Plans", "scope"),
+    ("proposal", "Plan 2 — AI Integration & Intelligent Document Chat", "scope"),
+    ("proposal", "6. Commercial Proposal", "commercial"),
+    ("proposal", "12. Proposal Approval", "completion"),
+    ("brd", "Appendix Z — Glossary", "unclassified"),
+    ("prd", "Platform notes", "unclassified"),          # "plan" must not match inside "Platform"
+])
+def test_heading_keywords(doc_type, heading, topic):
+    assert classify(doc_type, heading) == topic
 
 
-def test_documents_without_any_markers_are_fully_internal(documents):
-    for doc_id in ("p001-tech-architecture", "p001-qa-report", "p002-api-docs", "company-profitability-2026"):
-        doc = next(d for d in documents if d.id == doc_id)
-        assert all(s.visibility == INTERNAL for s in doc.sections), doc_id
+@pytest.mark.parametrize("line,money", [
+    ("Investment: $1,000", True),
+    ("Total Project Investment: $3,000 USD", True),
+    ("Payment terms: AED 140,000 in two milestones", True),
+    ("The system validates file type and size.", False),
+    ("99.5% monthly availability", False),
+    ("Plan 2 costs a lot of effort", False),        # money word, no amount
+    ("Released on 2026-12-05 for 1,200 students", False),  # amount-like numbers, no currency
+])
+def test_money_lines(line, money):
+    assert is_money_line(line) is money
 
 
-def test_unknown_visibility_value_fails_loudly():
-    src = "---\nid: x\ntitle: X\ndoc_type: brd\n---\n## A <!-- visibility: public -->\ntext\n"
+def test_split_commercial_moves_only_price_lines_and_keeps_order():
+    out = split_commercial([("4. Plans", "scope", "Plan 1 scope.\nInvestment: $1,000\nAcceptance criteria."),
+                            ("6. Commercial", "commercial", "Total $3,000")])
+    assert out == [("4. Plans", "scope", "Plan 1 scope.\nAcceptance criteria."),
+                   ("Commercial details — from 4. Plans", "commercial", "Investment: $1,000"),
+                   ("6. Commercial", "commercial", "Total $3,000")]
+
+
+def test_topic_marker_overrides_and_unknown_topic_fails():
+    src = "---\nid: x\ntitle: X\ndoc_type: brd\n---\n## Odd heading <!-- topic: risks -->\ntext\n"
+    assert parse_document(src).sections[0].topic == "risks"
     with pytest.raises(DocumentParseError):
-        parse_document(src)
+        parse_document(src.replace("risks", "secrets"))
+
+
+def test_unknown_document_type_fails():
+    with pytest.raises(DocumentParseError, match="unknown document type"):
+        parse_document("---\nid: x\ntitle: X\ndoc_type: minutes\n---\n## A\ntext\n")
 
 
 def test_missing_front_matter_fails():
@@ -46,38 +70,13 @@ def test_missing_front_matter_fails():
         parse_document("## A\ntext\n")
 
 
-def test_chunks_never_cross_sections_and_inherit_visibility(documents):
+def test_chunks_never_cross_sections_and_inherit_topic(documents):
     for doc in documents:
         sections = {s.ordinal: s for s in doc.sections}
-        for chunk in chunk_document(doc, max_chars=200):  # small size forces many splits
-            section = sections[chunk.section_ordinal]
-            assert chunk.visibility == section.visibility
-            body = chunk.text.split("\n\n", 1)[1]
-            assert body in section.content or all(part in section.content for part in body.split("\n\n"))
-
-
-def test_shared_and_internal_text_never_share_a_chunk(documents):
-    contract = next(d for d in documents if d.id == "p001-client-contract")
-    for chunk in chunk_document(contract, max_chars=5000):  # huge size: would merge if allowed
-        has_internal_fact = "USD 352,000" in chunk.text
-        if has_internal_fact:
-            assert chunk.visibility == MANAGEMENT
-            assert "USD 486,000" not in chunk.text
+        for chunk in chunk_document(doc, max_chars=200):
+            assert chunk.topic == sections[chunk.section_ordinal].topic
 
 
 def test_heading_inside_code_fence_is_not_a_section():
-    src = "---\nid: x\ntitle: X\ndoc_type: technical\n---\n## Real\n```\n## not a heading\n```\n"
-    doc = parse_document(src)
-    assert [s.heading for s in doc.sections] == ["Real"]
-
-
-@pytest.mark.parametrize("marker,expected", [("internal", "team"), ("team", "team"),
-                                             ("management", "management"), ("client_shared", "client_shared")])
-def test_visibility_markers(marker, expected):
-    src = f"---\nid: x\ntitle: X\ndoc_type: brd\n---\n## A <!-- visibility: {marker} -->\ntext\n"
-    assert parse_document(src).sections[0].visibility == expected
-
-
-def test_unmarked_section_is_team():
-    src = "---\nid: x\ntitle: X\ndoc_type: brd\n---\n## A\ntext\n"
-    assert parse_document(src).sections[0].visibility == "team"
+    src = "---\nid: x\ntitle: X\ndoc_type: prd\n---\n## Scope\n```\n## not a heading\n```\n"
+    assert [s.heading for s in parse_document(src).sections] == ["Scope"]
