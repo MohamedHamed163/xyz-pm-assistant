@@ -44,7 +44,7 @@ def ask(live, user, question, **kw):
     ("u-sara", "How long will the project take?", "droob-proposal"),
     ("u-khaled", "What are the payment terms?", "droob-proposal"),
     ("u-amina", "What are the business goals?", "droob-brd"),
-    ("u-youssef", "What are the business rules for renters?", "hub-brd"),
+    ("u-youssef", "How do renters verify their identity?", "hub-brd"),
 ])
 def test_live_answered(live, user, question, expect_doc):
     a = ask(live, user, question)
@@ -90,3 +90,12 @@ def test_live_follow_up_uses_history(live):
 def test_live_off_topic_is_chat_without_sources(live, question):
     a = ask(live, "u-sara", question)
     assert a.citations == [] and a.outcome in {"chat", "not_in_context"}, a
+
+
+@pytest.mark.parametrize("user,question,topic_word", [
+    ("u-youssef", "What are the business rules for renters?", "rules"),
+    ("u-khaled", "What are the functional requirements?", "requirement"),
+])
+def test_live_restricted_topic_is_explained_not_substituted(live, user, question, topic_word):
+    a = ask(live, user, question)
+    assert a.outcome == "chat" and a.citations == [] and topic_word in a.text.lower(), a

@@ -32,20 +32,25 @@ export interface Me {
   name: string;
   email: string;
   role: string;
+  role_label: string;
   organization: string | null;
   projects: { id: string; name: string }[];
   company_wide: boolean;
-  client_view: boolean;
+  access: Record<string, string[]>;
   can_upload: boolean;
 }
 
-export type Level = "client_shared" | "team" | "management";
+export interface TopicInfo {
+  key: string;
+  label: string;
+  roles: string[];
+}
 
 export interface UploadOptions {
   can_upload: boolean;
   projects: { id: string; name: string }[];
-  company_wide: boolean;
   doc_types: { name: string; label: string }[];
+  topics: Record<string, TopicInfo[]>;
 }
 
 export interface UploadItem {
@@ -58,15 +63,28 @@ export interface UploadItem {
   file_name: string;
   created_at: string;
   is_new_version: boolean;
+  unclassified: number;
+}
+
+export interface ReviewRequest {
+  id: number;
+  title: string;
+  project_id: string;
+  doc_type: string;
+  file_name: string;
+  created_at: string;
+  uploaded_by: string;
+  unclassified: number;
 }
 
 export interface DraftSection {
   ordinal?: number;
   heading: string;
   content: string;
-  visibility: Level;
+  topic: string;
+  topic_label?: string;
   changed?: boolean;
-  previous_visibility?: Level | null;
+  previous_topic?: string | null;
 }
 
 export interface Draft {
@@ -80,24 +98,44 @@ export interface Draft {
   kind: "pdf" | "docx";
   title: string;
   project_id: string | null;
+  project_name: string | null;
   doc_type: string;
   is_new_version: boolean;
   published: boolean;
   draft_expires_at: string | null;
-  client_name: string | null;
+  lock_version: number;
+  last_edited_by: string | null;
+  can_download: boolean;
   sections: DraftSection[];
-  summary: Record<Level, number>;
+  summary: Record<string, number>;
+  unclassified: number;
 }
 
 export interface ManagedDocument {
   id: string;
   title: string;
   project_id: string | null;
+  project_name: string | null;
   doc_type: string;
   updated_at: string;
   can_restore: boolean;
-  client_name: string | null;
-  sections: { ordinal: number; heading: string; visibility: Level }[];
+  sections: { ordinal: number; heading: string; topic: string; topic_label: string }[];
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  role_label: string;
+}
+
+export interface Team {
+  projects: { id: string; name: string; client: string | null; members: TeamMember[] }[];
+  users: TeamMember[];
+  roles: { name: string; label: string }[];
+  can_create_projects: boolean;
+  can_change_roles: boolean;
+  can_assign_pms: boolean;
 }
 
 export interface DemoUser {
@@ -215,15 +253,17 @@ export const api = {
   },
   uploads: () => request<{ items: UploadItem[] }>("/uploads"),
   upload: (id: number) => request<Draft>(`/uploads/${id}`),
-  saveSections: (id: number, sections: DraftSection[]) =>
+  saveSections: (id: number, sections: DraftSection[], lockVersion: number) =>
     request<Draft>(`/uploads/${id}/sections`, {
       method: "PUT",
       body: JSON.stringify({
-        sections: sections.map(({ heading, content, visibility }) => ({ heading, content, visibility })),
+        sections: sections.map(({ heading, content, topic }) => ({ heading, content, topic })),
+        lock_version: lockVersion,
       }),
     }),
+  reviewRequests: () => request<{ items: ReviewRequest[] }>("/uploads/review-requests"),
   publish: (id: number) =>
-    request<{ status: string; summary: Record<Level, number> }>(`/uploads/${id}/publish`, { method: "POST" }),
+    request<{ status: string; summary: Record<string, number> }>(`/uploads/${id}/publish`, { method: "POST" }),
   discard: (id: number) => request<void>(`/uploads/${id}/discard`, { method: "POST" }),
   downloadOriginal: async (id: number, fileName: string) => {
     const res = await fetch(`/api/uploads/${id}/file`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
@@ -234,13 +274,23 @@ export const api = {
     URL.revokeObjectURL(url);
   },
   managedDocuments: () => request<{ items: ManagedDocument[] }>("/documents/manage"),
-  setVisibility: (documentId: string, ordinal: number, visibility: Level) =>
-    request<{ previous: Level }>(`/documents/${encodeURIComponent(documentId)}/sections/${ordinal}`, {
+  setTopic: (documentId: string, ordinal: number, topic: string) =>
+    request<{ previous: string }>(`/documents/${encodeURIComponent(documentId)}/sections/${ordinal}`, {
       method: "PATCH",
-      body: JSON.stringify({ visibility }),
+      body: JSON.stringify({ topic }),
     }),
   restorePrevious: (documentId: string) =>
     request<{ current_version_id: number }>(`/documents/${encodeURIComponent(documentId)}/restore-previous`, {
       method: "POST",
     }),
+
+  team: () => request<Team>("/team"),
+  createProject: (name: string, client: string) =>
+    request<{ id: string }>("/team/projects", { method: "POST", body: JSON.stringify({ name, client }) }),
+  addMember: (projectId: string, userId: string) =>
+    request<unknown>(`/team/projects/${projectId}/members`, { method: "POST", body: JSON.stringify({ user_id: userId }) }),
+  removeMember: (projectId: string, userId: string) =>
+    request<unknown>(`/team/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
+  changeRole: (userId: string, role: string) =>
+    request<unknown>(`/team/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
 };

@@ -3,16 +3,17 @@ import {
   api,
   ApiError,
   type Draft,
-  type Level,
   type ManagedDocument,
   type Me,
+  type ReviewRequest,
   type UploadItem,
   type UploadOptions,
 } from "./api";
-import { LEVEL_META, LevelPicker } from "./levels";
 import Review from "./Review";
+import Team from "./Team";
+import { DOC_TYPE_LABEL, TopicSelect } from "./topics";
 
-type Tab = "upload" | "uploads" | "live";
+type Tab = "upload" | "uploads" | "requests" | "live" | "team";
 
 const STATUS_LABEL: Record<UploadItem["status"], string> = {
   parsing: "Parsing…",
@@ -25,8 +26,16 @@ const STATUS_LABEL: Record<UploadItem["status"], string> = {
 
 export default function Documents({ me, onBack }: { me: Me; onBack: () => void }) {
   const [tab, setTab] = useState<Tab>("upload");
+  const [options, setOptions] = useState<UploadOptions | null>(null);
   const [reviewing, setReviewing] = useState<Draft | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [requests, setRequests] = useState<ReviewRequest[]>([]);
+
+  const loadRequests = useCallback(() => api.reviewRequests().then((r) => setRequests(r.items)), []);
+  useEffect(() => {
+    api.uploadOptions().then(setOptions);
+    loadRequests();
+  }, [loadRequests]);
 
   async function openReview(id: number) {
     setReviewing(await api.upload(id));
@@ -36,7 +45,16 @@ export default function Documents({ me, onBack }: { me: Me; onBack: () => void }
     setReviewing(null);
     setFlash(message);
     setTab("uploads");
+    loadRequests();
   }
+
+  const tabs: [Tab, string][] = [
+    ["upload", "Upload"],
+    ["uploads", "My uploads"],
+    ["requests", `Review requests${requests.length ? ` (${requests.length})` : ""}`],
+    ["live", "Live documents"],
+    ["team", "Team"],
+  ];
 
   return (
     <div className="docs-page">
@@ -49,18 +67,12 @@ export default function Documents({ me, onBack }: { me: Me; onBack: () => void }
       </header>
 
       <main className="docs-main">
-        {reviewing ? (
-          <Review draft={reviewing} onDone={doneReviewing} />
+        {reviewing && options ? (
+          <Review draft={reviewing} topics={options.topics[reviewing.doc_type] ?? []} onDone={doneReviewing} />
         ) : (
           <>
             <nav className="tabs" role="tablist">
-              {(
-                [
-                  ["upload", "Upload"],
-                  ["uploads", "My uploads"],
-                  ["live", "Live documents"],
-                ] as [Tab, string][]
-              ).map(([t, label]) => (
+              {tabs.map(([t, label]) => (
                 <button key={t} role="tab" aria-selected={tab === t} className={`tab ${tab === t ? "on" : ""}`} onClick={() => setTab(t)}>
                   {label}
                 </button>
@@ -74,17 +86,20 @@ export default function Documents({ me, onBack }: { me: Me; onBack: () => void }
                 </button>
               </p>
             )}
-            {tab === "upload" && (
+            {tab === "upload" && options && (
               <UploadForm
+                options={options}
                 onUploaded={(id) => {
-                  setFlash("Uploaded — parsing the file…");
+                  setFlash("Uploaded — reading the file and tagging sections…");
                   setTab("uploads");
                   pollUntilParsed(id, openReview, setFlash);
                 }}
               />
             )}
             {tab === "uploads" && <MyUploads onOpen={openReview} />}
-            {tab === "live" && <LiveDocuments />}
+            {tab === "requests" && <ReviewRequests items={requests} onOpen={openReview} />}
+            {tab === "live" && options && <LiveDocuments options={options} />}
+            {tab === "team" && <Team me={me} />}
           </>
         )}
       </main>
@@ -103,13 +118,12 @@ async function pollUntilParsed(id: number, open: (id: number) => void, flash: (m
 
 // ---------------------------------------------------------------------------------------------
 
-function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void }) {
-  const [options, setOptions] = useState<UploadOptions | null>(null);
+function UploadForm({ options, onUploaded }: { options: UploadOptions; onUploaded: (versionId: number) => void }) {
   const [docs, setDocs] = useState<ManagedDocument[]>([]);
   const [mode, setMode] = useState<"new" | "version">("new");
   const [file, setFile] = useState<File | null>(null);
-  const [project, setProject] = useState("");
-  const [docType, setDocType] = useState("");
+  const [project, setProject] = useState(options.projects[0]?.id ?? "");
+  const [docType, setDocType] = useState(options.doc_types[0]?.name ?? "");
   const [title, setTitle] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -117,11 +131,6 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.uploadOptions().then((o) => {
-      setOptions(o);
-      setProject(o.projects[0]?.id ?? "");
-      setDocType(o.doc_types[0]?.name ?? "");
-    });
     api.managedDocuments().then((r) => setDocs(r.items));
   }, []);
 
@@ -132,6 +141,9 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
     if (f.size > 20 * 1024 * 1024) return setError("Files can be at most 20 MB.");
     setFile(f);
     if (!title) setTitle(f.name.replace(/\.(pdf|docx)$/i, ""));
+    if (/\bprd\b/i.test(f.name)) setDocType("prd");
+    else if (/\bbrd\b/i.test(f.name)) setDocType("brd");
+    else if (/proposal/i.test(f.name)) setDocType("proposal");
   }
 
   async function submit(e: FormEvent) {
@@ -152,7 +164,7 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
     }
   }
 
-  if (!options) return <p className="muted pad">Loading…</p>;
+  if (!options.can_upload) return <p className="muted pad">You're not a project manager on any project yet.</p>;
 
   return (
     <form className="upload-form" onSubmit={submit}>
@@ -176,8 +188,8 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
           </>
         ) : (
           <>
-            <strong>Drop a PDF or Word file here</strong>
-            <span className="muted small">or click to choose · max 20 MB, 300 pages</span>
+            <strong>Drop a BRD, PRD or Proposal here</strong>
+            <span className="muted small">PDF or Word · max 20 MB, 300 pages</span>
           </>
         )}
       </div>
@@ -202,7 +214,6 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
                   {p.id} · {p.name}
                 </option>
               ))}
-              {options.company_wide && <option value="">Company-wide (no project)</option>}
             </select>
           </label>
           <label>
@@ -227,17 +238,18 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
             <option value="">Choose…</option>
             {docs.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.project_id ?? "Company"} · {d.title}
+                {d.project_id} · {DOC_TYPE_LABEL[d.doc_type]} · {d.title}
               </option>
             ))}
           </select>
-          <span className="muted small">Project and type stay the same. Section levels you chose before are reused.</span>
+          <span className="muted small">Topics you chose before are reused for matching headings.</span>
         </label>
       )}
 
       <p className="muted small">
-        Every section starts as <strong>{LEVEL_META.team.label}</strong> ({LEVEL_META.team.who}). You choose what to share
-        with the client before anything is published.
+        Sections are tagged with a topic automatically from their headings, and prices are moved into a
+        Commercial section. You'll check the tags before publishing; who can read each topic follows the
+        company's rules.
       </p>
       {error && <p className="error-text">{error}</p>}
       <button className="btn-primary" type="submit" disabled={!file || busy || (mode === "version" && !documentId)}>
@@ -251,14 +263,12 @@ function UploadForm({ onUploaded }: { onUploaded: (versionId: number) => void })
 
 function MyUploads({ onOpen }: { onOpen: (id: number) => void }) {
   const [items, setItems] = useState<UploadItem[] | null>(null);
-
   const load = useCallback(() => api.uploads().then((r) => setItems(r.items)), []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Poll only while something is still being parsed or published.
   useEffect(() => {
     if (!items?.some((u) => u.status === "parsing" || u.status === "processing")) return;
     const t = setTimeout(load, 2000);
@@ -267,7 +277,6 @@ function MyUploads({ onOpen }: { onOpen: (id: number) => void }) {
 
   if (!items) return <p className="muted pad">Loading…</p>;
   if (!items.length) return <p className="muted pad">No uploads yet.</p>;
-
   return (
     <ul className="upload-list">
       {items.map((u) => (
@@ -275,10 +284,13 @@ function MyUploads({ onOpen }: { onOpen: (id: number) => void }) {
           <div className="upload-main">
             <strong>{u.title}</strong>
             <span className="muted small">
-              {u.project_id ?? "Company-wide"} · {u.doc_type.toUpperCase()} · {u.file_name}
+              {u.project_id} · {DOC_TYPE_LABEL[u.doc_type]} · {u.file_name}
               {u.is_new_version ? " · new version" : ""} · {new Date(u.created_at).toLocaleString()}
             </span>
             {u.error && <span className="error-text small">{u.error}</span>}
+            {u.status === "draft" && u.unclassified > 0 && (
+              <span className="warn-text small">{u.unclassified} section{u.unclassified > 1 ? "s need" : " needs"} a topic</span>
+            )}
           </div>
           <span className={`status status-${u.status}`}>{STATUS_LABEL[u.status]}</span>
           {(u.status === "draft" || u.status === "failed") && (
@@ -292,24 +304,45 @@ function MyUploads({ onOpen }: { onOpen: (id: number) => void }) {
   );
 }
 
+function ReviewRequests({ items, onOpen }: { items: ReviewRequest[]; onOpen: (id: number) => void }) {
+  if (!items.length) return <p className="muted pad">Nothing waiting — every draft in your projects is classified.</p>;
+  return (
+    <ul className="upload-list">
+      {items.map((r) => (
+        <li key={r.id} className="upload-item">
+          <div className="upload-main">
+            <strong>{r.title}</strong>
+            <span className="muted small">
+              {r.project_id} · {DOC_TYPE_LABEL[r.doc_type]} · uploaded by {r.uploaded_by} ·{" "}
+              {new Date(r.created_at).toLocaleString()}
+            </span>
+            <span className="warn-text small">{r.unclassified} section{r.unclassified > 1 ? "s need" : " needs"} a topic</span>
+          </div>
+          <button className="btn-primary" onClick={() => onOpen(r.id)}>
+            Classify
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ---------------------------------------------------------------------------------------------
 
-function LiveDocuments() {
+function LiveDocuments({ options }: { options: UploadOptions }) {
   const [docs, setDocs] = useState<ManagedDocument[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
   const load = useCallback(() => api.managedDocuments().then((r) => setDocs(r.items)), []);
   useEffect(() => {
     load();
   }, [load]);
 
-  async function change(doc: ManagedDocument, ordinal: number, heading: string, level: Level) {
-    if (level === "client_shared" && !confirm(`Share “${heading}” with the client${doc.client_name ? ` (${doc.client_name})` : ""}? It becomes visible immediately.`))
-      return;
+  async function change(doc: ManagedDocument, ordinal: number, heading: string, topic: string) {
+    const label = options.topics[doc.doc_type]?.find((t) => t.key === topic)?.label ?? topic;
     try {
-      await api.setVisibility(doc.id, ordinal, level);
-      setMessage(`“${heading}” is now ${LEVEL_META[level].label.toLowerCase()} — effective immediately.`);
+      await api.setTopic(doc.id, ordinal, topic);
+      setMessage(`“${heading}” is now tagged ${label} — effective immediately.`);
       load();
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Change failed");
@@ -338,13 +371,8 @@ function LiveDocuments() {
               <strong>{d.title}</strong>
               <span className="muted small">
                 {" "}
-                · {d.project_id ?? "Company-wide"} · {d.doc_type.toUpperCase()} · {d.sections.length} sections
+                · {d.project_id} · {DOC_TYPE_LABEL[d.doc_type]} · {d.sections.length} sections
               </span>
-            </span>
-            <span className="level-dots" aria-hidden>
-              {d.sections.map((s) => (
-                <i key={s.ordinal} className={`dot level-${s.visibility}`} />
-              ))}
             </span>
           </button>
           {open === d.id && (
@@ -352,7 +380,12 @@ function LiveDocuments() {
               {d.sections.map((s) => (
                 <div key={s.ordinal} className="live-section">
                   <span>{s.heading}</span>
-                  <LevelPicker value={s.visibility} name={s.heading} onChange={(l) => l !== s.visibility && change(d, s.ordinal, s.heading, l)} />
+                  <TopicSelect
+                    topics={options.topics[d.doc_type] ?? []}
+                    value={s.topic}
+                    label={`Topic of ${s.heading}`}
+                    onChange={(t) => t !== s.topic && change(d, s.ordinal, s.heading, t)}
+                  />
                 </div>
               ))}
               {d.can_restore && (
@@ -364,7 +397,7 @@ function LiveDocuments() {
           )}
         </section>
       ))}
-      {docs.length === 0 && <p className="muted pad">No documents you can manage yet.</p>}
+      {docs.length === 0 && <p className="muted pad">No published documents in your projects yet.</p>}
     </div>
   );
 }

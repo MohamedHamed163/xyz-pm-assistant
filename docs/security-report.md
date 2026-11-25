@@ -76,6 +76,12 @@ passage it was given verbatim and cites all of them.
 | A28 | Malicious files: renamed `.exe`, non-Word zip, zip bomb (100 KB → 101 MB), 1,001 zip entries, corrupt PDF, parser hang | ✅ Rejected with a clear message; parser isolated with timeout | `test_parsing.py` |
 | A29 | Publish over a newer version, or after losing project access | ✅ 409 naming who published / 403 | `test_publishing_over_a_newer_version_is_blocked`, `test_permission_is_rechecked_at_publish` |
 | A30 | Developer/QA read management sections; management grant lifts the client cap | ✅ Hidden / client stays at client_shared | `test_permissions.py` level tests, leak grid |
+| A31 | Role × topic grid: every marker in 6 documents checked for 7 users against a hand-written copy of the table | ✅ Exact match | `test_permissions.py::test_role_table` |
+| A32 | Price inside an allowed section (plan "Investment: $1,000" inside Scope) asked by developer/QA, with a compromised model | ✅ No "$" reaches them; Finance gets the price | `test_prices_never_reach_roles_without_commercial`, live tests |
+| A33 | Unclassified section read by a non-CEO/PM; publish while unclassified | ✅ Hidden / 409 | `test_unclassified_is_ceo_and_pm_only`, `test_unclassified_blocks_publish_and_shows_in_review_requests` |
+| A34 | Two reviewers save the same draft | ✅ Second gets 409 "reload" | `test_two_reviewers_cannot_overwrite_each_other` |
+| A35 | PM manages another project, removes a PM, changes roles; anyone removes the last PM | ✅ 404 / 403 / 409 | `test_team.py` |
+| A36 | Model answers a forbidden topic with a different topic's passages ("business rules" → requirements) | ✅ Prompt rule; live test checks the rule is explained instead | `test_live_restricted_topic_is_explained_not_substituted` |
 | A19 | App-level filter bug (WHERE clause dropped) | ✅ RLS alone still enforces the same permissions | `test_db_permissions.py::test_rls_still_protects_when_application_filter_is_broken` |
 
 ## 5. Findings fixed during the build
@@ -116,6 +122,8 @@ still worked. The probe document and conversation were then deleted.
 | The live OpenAI path has not been exercised (no key in this environment) | Medium | Run `tests/test_live_openai.py`; tune `RAG_MAX_DISTANCE` |
 | Sequential ids reveal approximate volumes of chats and chunks | Low | UUIDs for externally visible ids |
 | `audit_log` is append-only for the app role but editable by the owner | Low | Ship to an external append-only store |
+| Heading keywords fit these templates; other companies' headings fall into Unclassified more often | Low (safe, more review work) | Extend `topic_headings`; review requests make the work visible |
+| A price written in words ("one thousand dollars") isn't split out | Medium | Reviewers see the Commercial split; extend the money-line rule |
 | The model can misstate *authorized* content | Low (integrity) | Citations on every answer; user feedback loop |
 | A `chat` reply is not citation-checked, so a model could state an XYZ fact without a source | Low (integrity — content is still only what the user may read) | Prompt rule 2; optional check that flags chat replies overlapping passage text |
 | General-knowledge chat can be wrong and is not grounded | Low | Clearly no sources shown; keep XYZ facts on the cited path |

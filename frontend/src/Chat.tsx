@@ -186,9 +186,16 @@ export default function Chat({
           </span>
           <div className="me-body">
             <div className="me-name">{me.name}</div>
-            <span className={`role-badge role-${me.role}`}>{ROLE_LABEL[me.role] ?? me.role}</span>
+            <span className={`role-badge role-${me.role}`}>{me.role_label ?? ROLE_LABEL[me.role] ?? me.role}</span>
             <div className="me-scope">{scope}</div>
-            {me.client_view && <div className="me-scope">Client view: shared sections only</div>}
+            <details className="me-access">
+              <summary>What I can ask about</summary>
+              {Object.entries(me.access).map(([type, topics]) => (
+                <div key={type} className="me-scope">
+                  <strong>{type.toUpperCase()}:</strong> {topics.filter((t) => t !== "Unclassified").join(", ") || "—"}
+                </div>
+              ))}
+            </details>
           </div>
           <button className="link-btn" onClick={onLogout}>
             Switch user

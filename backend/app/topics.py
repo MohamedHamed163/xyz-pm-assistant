@@ -125,8 +125,15 @@ def split_commercial(sections: list[tuple[str, str, str]]) -> list[tuple[str, st
             out.append((heading, topic, content))
             continue
         kept, moved = [], []
+        subheading = None                                # e.g. "### Plan 2 — AI Integration"
         for line in content.splitlines():
-            (moved if line.strip() and is_money_line(line) else kept).append(line)
+            if line.startswith("### "):
+                subheading = line[4:].strip()
+            if line.strip() and is_money_line(line):
+                # Keep the context so "Investment: $1,000" still says which plan it belongs to.
+                moved.append(f"{subheading}: {line.strip()}" if subheading else line)
+            else:
+                kept.append(line)
         remaining = "\n".join(kept).strip()
         if remaining:
             out.append((heading, topic, re.sub(r"\n{3,}", "\n\n", remaining)))

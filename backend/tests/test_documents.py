@@ -80,3 +80,11 @@ def test_chunks_never_cross_sections_and_inherit_topic(documents):
 def test_heading_inside_code_fence_is_not_a_section():
     src = "---\nid: x\ntitle: X\ndoc_type: prd\n---\n## Scope\n```\n## not a heading\n```\n"
     assert [s.heading for s in parse_document(src).sections] == ["Scope"]
+
+
+def test_split_lines_keep_their_sub_heading():
+    content = "### Plan 1 — Foundation\nScope one.\nInvestment: $1,000\n### Plan 2 — AI\nScope two.\nInvestment: $1,000"
+    out = split_commercial([("4. Project Delivery Plans", "scope", content)])
+    assert out[1] == ("Commercial details — from 4. Project Delivery Plans", "commercial",
+                      "Plan 1 — Foundation: Investment: $1,000\nPlan 2 — AI: Investment: $1,000")
+    assert "$" not in out[0][2] and "### Plan 2 — AI" in out[0][2]

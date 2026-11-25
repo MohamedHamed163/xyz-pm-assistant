@@ -20,7 +20,8 @@ the LLM never receives unauthorized content.
 | 4 | FastAPI auth, chat history API, React chat UI | ✅ |
 | 5 | End-to-end attack suite + security report | ✅ |
 | 6 | Conversational chat (profile, follow-ups) | ✅ |
-| 7 | PDF/DOCX upload, three section levels, review & publish, live fixes | ✅ |
+| 7 | PDF/DOCX upload, review & publish, live fixes | ✅ |
+| 8 | Topic-based access (role × doc type × topic), review requests, team management | ✅ |
 
 ## Layout
 
@@ -60,7 +61,7 @@ createdb xyz_pm
 ```
 
 ```bash
-cd backend && ../.venv/bin/python -m app.seed_db
+cd backend && ../.venv/bin/python -m app.seed_db              # add --sample-docs to load the sample corpus
 ```
 
 Set `OPENAI_API_KEY` first to use real embeddings; without it an offline word-hashing embedder is
@@ -137,24 +138,46 @@ Every refusal path returns the identical sentence, so a refusal never confirms t
 Tests cover a fully compromised model that dumps its whole prompt: it can only leak what the user
 was already allowed to read.
 
-## Uploading documents
+## Access model — role × document type × topic
 
-CEO and PMs get a **Documents** button in the chat sidebar:
+The assistant knows three document types — **BRD, PRD, Proposal** — and splits each into sections.
+Every section is tagged with a **topic** automatically from its heading; a fixed rule table decides
+which roles read which topics, in the projects they belong to (the CEO sees every project).
 
-1. **Upload** a PDF or Word file (new document, or new version of an existing one).
-2. The file is parsed into sections in the background (headings, tables; TOC and footers removed).
-3. **Review**: rename, merge or split sections and choose who sees each one —
-   🟢 Client · 🔵 Team (default) · 🔴 Management. Bulk select, filter and search help with long files.
-4. **Publish** after a summary such as "4 sections visible to the client (Nile Retail Group)".
-5. **Live documents**: change a section's level later (takes effect immediately) or restore the
-   previous version.
+| Role | BRD | PRD | Proposal |
+|------|-----|-----|----------|
+| CEO, Project Manager, Client | everything | everything | everything |
+| Developer | Context, Requirements & scope | everything except Commercial | Scope & deliverables, Timeline |
+| QA Engineer | Goals & objectives, Business rules | everything except Commercial | Scope & deliverables, Completion & approval |
+| Finance Manager | Goals & objectives, Commercial | Overview, Scope, Commercial | everything |
 
-| Role | Can upload | Sees |
-|------|------------|------|
-| CEO | any type, any project or company-wide | 🟢🔵🔴 everywhere |
-| PM | BRD/PRD/technical/QA/minutes in own projects | 🟢🔵🔴 in own projects |
-| Developer / QA | — | 🟢🔵 in own projects |
-| Client | — | 🟢 in own project |
+Plus "Document details" (the cover block) for anyone who may read part of a document.
+
+- **Prices are split out**: a line with a currency amount and a money word ("Investment: $1,000")
+  moves into a Commercial section — labelled with the plan it came from — so it never reaches a
+  developer or QA engineer even when it sat inside an allowed section.
+- **Unrecognized headings** become *Unclassified* (CEO/PM only). A document can't be published until
+  every section has a topic; it appears under **Review requests** for the project's PMs and the CEO.
+- **Asking outside your topics** gets the rule explained ("pricing is in the Proposal's Commercial
+  section, which your role doesn't include"); asking about **another project** gets a neutral answer.
+
+The rules live in `data/seed/company.yaml` (seeded into `role_topic_access`); changing a rule applies
+on the next question without re-processing any document.
+
+## Uploading documents and managing teams
+
+CEO and PMs get a **Documents** button:
+
+1. **Upload** a BRD, PRD or Proposal (PDF or Word) to a project — or a new version of one.
+2. Sections are parsed and tagged; prices split out; tables of contents and page headers removed.
+3. **Review**: check topics (bulk set, filter, search), rename, merge or split. The text itself can't
+   change. Two reviewers can't overwrite each other — the second gets "reload".
+4. **Publish** after a summary of who reads each topic.
+5. **Live documents**: fix a section's topic later (immediate, audited) or restore the previous version.
+6. **Team**: the CEO creates projects, assigns PMs and changes roles; PMs add or remove members on
+  their own projects. Every project keeps a PM; every change is recorded.
+
+Sample files for testing: `samples/Hub Drives BRD.pdf`, `Hub Drives PRD.docx`, `Hub Drives Proposal.pdf`.
 
 ## API
 

@@ -1,39 +1,48 @@
 import { useMemo, useState } from "react";
-import { api, ApiError, type Draft, type DraftSection, type Level } from "./api";
-import { LEVEL_META, LEVELS, LevelPicker, summaryText } from "./levels";
+import { api, ApiError, type Draft, type DraftSection, type TopicInfo } from "./api";
+import { DOC_TYPE_LABEL, TopicSelect, whoCanRead } from "./topics";
 
-// Review a parsed upload: rename, merge, split, choose who sees each section, then publish.
-// The text itself can't be edited — the backend rejects any change to it.
+// Review a parsed upload: check the automatic topic of each section, rename, merge or split, then
+// publish. Who can read each topic is fixed by the rules — the reviewer only checks the tags.
+// The text itself can't be edited; the backend rejects any change to it.
 
-export default function Review({ draft, onDone }: { draft: Draft; onDone: (message: string) => void }) {
-  const [sections, setSections] = useState<DraftSection[]>(draft.sections);
+export default function Review({
+  draft: initial,
+  topics,
+  onDone,
+}: {
+  draft: Draft;
+  topics: TopicInfo[];
+  onDone: (message: string) => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  const [sections, setSections] = useState<DraftSection[]>(initial.sections);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [filter, setFilter] = useState<Level | "all" | "changed">("all");
+  const [filter, setFilter] = useState<string>(initial.unclassified ? "unclassified" : "all");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [splitting, setSplitting] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const editable = draft.status === "draft" || (draft.status === "failed" && draft.published);
+  const [stale, setStale] = useState(false);
+  const editable = draft.status === "draft";
+  const canPublish = editable || (draft.status === "failed" && draft.published);
 
-  const summary = useMemo(() => {
-    const s: Record<Level, number> = { client_shared: 0, team: 0, management: 0 };
-    sections.forEach((x) => s[x.visibility]++);
-    return s;
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    sections.forEach((s) => (c[s.topic] = (c[s.topic] ?? 0) + 1));
+    return c;
   }, [sections]);
+  const unclassified = counts.unclassified ?? 0;
 
   const shown = sections
     .map((s, i) => ({ s, i }))
-    .filter(({ s }) => (filter === "all" ? true : filter === "changed" ? s.changed : s.visibility === filter))
+    .filter(({ s }) => (filter === "all" ? true : filter === "changed" ? s.changed : s.topic === filter))
     .filter(({ s }) => !query || `${s.heading} ${s.content}`.toLowerCase().includes(query.toLowerCase()));
 
   const update = (i: number, patch: Partial<DraftSection>) =>
     setSections((all) => all.map((s, j) => (j === i ? { ...s, ...patch } : s)));
-
-  function setLevelForSelected(level: Level) {
-    setSections((all) => all.map((s, i) => (selected.has(i) ? { ...s, visibility: level } : s)));
-  }
 
   function toggle(i: number) {
     setSelected((sel) => {
@@ -47,10 +56,9 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
   function mergeWithNext(i: number) {
     setSections((all) => {
       const a = all[i], b = all[i + 1];
-      // Merged text keeps the more restrictive level, so merging never widens access.
-      const level = LEVELS.indexOf(a.visibility) >= LEVELS.indexOf(b.visibility) ? a.visibility : b.visibility;
-      const merged = { ...a, content: `${a.content}\n\n${b.content}`, visibility: level, changed: true };
-      return [...all.slice(0, i), merged, ...all.slice(i + 2)];
+      // Different topics can't be merged blindly: the merged section stays unclassified until chosen.
+      const topic = a.topic === b.topic ? a.topic : "unclassified";
+      return [...all.slice(0, i), { ...a, content: `${a.content}\n\n${b.content}`, topic, changed: true }, ...all.slice(i + 2)];
     });
     setSelected(new Set());
   }
@@ -63,25 +71,36 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
       return [...all.slice(0, i), first, second, ...all.slice(i + 1)];
     });
     setSplitting(null);
-    setSelected(new Set());
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
-      await api.saveSections(draft.id, sections);
+      const saved = await api.saveSections(draft.id, sections, draft.lock_version);
+      setDraft(saved);
+      setSections(saved.sections);
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Couldn't save");
+      const message = e instanceof ApiError ? e.message : "Couldn't save";
+      setError(message);
+      if (e instanceof ApiError && e.status === 409) setStale(true);
       return false;
     } finally {
       setBusy(false);
     }
   }
 
+  async function reload() {
+    const fresh = await api.upload(draft.id);
+    setDraft(fresh);
+    setSections(fresh.sections);
+    setStale(false);
+    setError(null);
+  }
+
   async function publish() {
-    if (draft.status === "draft" && !(await save())) return;
+    if (editable && !(await save())) return setConfirming(false);
     setBusy(true);
     try {
       await api.publish(draft.id);
@@ -108,18 +127,36 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
         <div>
           <h2>{draft.title}</h2>
           <p className="muted small">
-            {draft.project_id ?? "Company-wide"} · {draft.doc_type.toUpperCase()} · {draft.file_name}
+            {draft.project_id} · {draft.project_name} · {DOC_TYPE_LABEL[draft.doc_type] ?? draft.doc_type} · {draft.file_name}
             {draft.page_count ? ` · ${draft.page_count} pages` : ""} · {sections.length} sections
             {draft.is_new_version ? " · new version" : ""}
           </p>
         </div>
-        <button className="link-btn" onClick={() => api.downloadOriginal(draft.id, draft.file_name)}>
-          Download original
-        </button>
+        {draft.can_download && (
+          <button className="link-btn" onClick={() => api.downloadOriginal(draft.id, draft.file_name)}>
+            Download original
+          </button>
+        )}
       </header>
 
+      {unclassified > 0 && (
+        <p className="notice-bar warn">
+          <span>
+            <strong>{unclassified} section{unclassified > 1 ? "s need" : " needs"} a topic.</strong> Unclassified
+            sections are readable by CEO and PM only, and the document can't be published until every section has a topic.
+          </span>
+        </p>
+      )}
       {draft.status === "failed" && draft.published && (
-        <p className="notice-bar error">Publishing failed: {draft.error}. You can try publishing again.</p>
+        <p className="notice-bar error">Publishing failed: {draft.error}. You can try again.</p>
+      )}
+      {stale && (
+        <p className="notice-bar error">
+          {error}
+          <button className="btn-secondary" onClick={reload}>
+            Reload
+          </button>
+        </p>
       )}
 
       <div className="review-tools">
@@ -127,27 +164,34 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
           <input
             type="checkbox"
             checked={allShownSelected}
-            onChange={() =>
-              setSelected(allShownSelected ? new Set() : new Set([...selected, ...shown.map(({ i }) => i)]))
-            }
+            onChange={() => setSelected(allShownSelected ? new Set() : new Set([...selected, ...shown.map(({ i }) => i)]))}
           />
           {selected.size ? `${selected.size} selected` : "Select all"}
         </label>
-        {selected.size > 0 && (
+        {selected.size > 0 && editable && (
           <div className="bulk">
             Set to
-            <LevelPicker value={null} name="selected sections" onChange={setLevelForSelected} disabled={!editable} />
+            <TopicSelect
+              topics={topics}
+              value={null}
+              label="Topic for selected sections"
+              placeholder="Choose topic…"
+              onChange={(t) => setSections((all) => all.map((s, i) => (selected.has(i) ? { ...s, topic: t } : s)))}
+            />
           </div>
         )}
         <div className="spacer" />
-        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter sections">
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter sections">
           <option value="all">All sections</option>
+          <option value="unclassified">⚠ Needs a topic ({unclassified})</option>
           <option value="changed">New / changed</option>
-          {LEVELS.map((l) => (
-            <option key={l} value={l}>
-              {LEVEL_META[l].label}
-            </option>
-          ))}
+          {topics
+            .filter((t) => t.key !== "unclassified")
+            .map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label} ({counts[t.key] ?? 0})
+              </option>
+            ))}
         </select>
         <input className="search" placeholder="Search sections" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
@@ -156,7 +200,7 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
         {shown.map(({ s, i }) => {
           const paragraphs = s.content.split(/\n\s*\n/);
           return (
-            <li key={i} className={`section-card level-edge-${s.visibility} ${selected.has(i) ? "selected" : ""}`}>
+            <li key={i} className={`section-card ${s.topic === "unclassified" ? "needs-topic" : ""} ${selected.has(i) ? "selected" : ""}`}>
               <div className="section-row">
                 <input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} aria-label={`Select ${s.heading}`} />
                 <input
@@ -168,9 +212,9 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
                   aria-label="Section heading"
                 />
                 {s.changed && draft.is_new_version && <span className="badge">New / changed</span>}
-                <LevelPicker value={s.visibility} name={s.heading} disabled={!editable} onChange={(v) => update(i, { visibility: v })} />
+                <TopicSelect topics={topics} value={s.topic} label={`Topic of ${s.heading}`} disabled={!editable}
+                  onChange={(t) => update(i, { topic: t })} />
               </div>
-
               <div className={`section-preview ${expanded === i ? "open" : ""}`}>
                 {splitting === i
                   ? paragraphs.map((p, n) => (
@@ -187,7 +231,6 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
                     ? paragraphs.map((p, n) => <p key={n}>{p}</p>)
                     : <p>{s.content.slice(0, 220)}{s.content.length > 220 ? "…" : ""}</p>}
               </div>
-
               <div className="section-actions">
                 <button className="link-btn" onClick={() => setExpanded(expanded === i ? null : i)}>
                   {expanded === i ? "Collapse" : "Show all"}
@@ -202,7 +245,7 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
                     {splitting === i ? "Cancel split" : "Split"}
                   </button>
                 )}
-                <span className="muted small">{LEVEL_META[s.visibility].who}</span>
+                <span className="muted small">Readable by: {whoCanRead(topics, s.topic)}</span>
               </div>
             </li>
           );
@@ -211,50 +254,49 @@ export default function Review({ draft, onDone }: { draft: Draft; onDone: (messa
       </ol>
 
       <footer className="review-foot">
-        <div className="summary">{summaryText(summary, draft.client_name)}</div>
-        {error && <p className="error-text">{error}</p>}
-        {editable && (
-          <div className="foot-actions">
-            {draft.status === "draft" && (
-              <>
-                <button className="link-btn danger" onClick={discard} disabled={busy}>
-                  Discard
-                </button>
-                <button className="btn-secondary" onClick={() => save().then((ok) => ok && onDone("Draft saved."))} disabled={busy}>
-                  Save draft
-                </button>
-              </>
-            )}
-            <button className="btn-primary" onClick={() => setConfirming(true)} disabled={busy}>
+        <div className="summary">
+          {unclassified ? `${unclassified} still ${unclassified > 1 ? "need" : "needs"} a topic` : "Every section has a topic"}
+          {draft.last_edited_by ? <span className="muted small"> · last saved by {draft.last_edited_by}</span> : null}
+        </div>
+        {error && !stale && <p className="error-text">{error}</p>}
+        <div className="foot-actions">
+          {editable && (
+            <>
+              <button className="link-btn danger" onClick={discard} disabled={busy}>
+                Discard
+              </button>
+              <button className="btn-secondary" onClick={() => save().then((ok) => ok && onDone("Draft saved."))} disabled={busy || stale}>
+                Save draft
+              </button>
+            </>
+          )}
+          {canPublish && (
+            <button
+              className="btn-primary"
+              onClick={() => setConfirming(true)}
+              disabled={busy || stale || unclassified > 0}
+              title={unclassified ? "Give every section a topic first" : undefined}
+            >
               Publish…
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </footer>
 
       {confirming && (
         <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
           <div className="modal">
             <h3 id="confirm-title">Publish “{draft.title}”?</h3>
+            <p className="muted small">Each topic is readable by these roles in {draft.project_name}:</p>
             <ul className="confirm-list">
-              {summary.client_shared > 0 && (
-                <li className="level-text-client_shared">
-                  <strong>{summary.client_shared}</strong> section{summary.client_shared > 1 ? "s" : ""} will be visible to
-                  the client{draft.client_name ? ` (${draft.client_name})` : ""}:
-                  <span className="muted small">
-                    {" "}
-                    {sections.filter((s) => s.visibility === "client_shared").map((s) => s.heading).join(", ")}
-                  </span>
-                </li>
-              )}
-              <li>
-                <strong>{summary.team}</strong> team (PM, developers, QA, CEO)
-              </li>
-              <li className="level-text-management">
-                <strong>{summary.management}</strong> management only (PM and CEO)
-              </li>
+              {topics
+                .filter((t) => counts[t.key])
+                .map((t) => (
+                  <li key={t.key} className={t.key === "commercial" ? "topic-commercial" : ""}>
+                    <strong>{t.label}</strong> ({counts[t.key]}) — {t.roles.join(", ")}
+                  </li>
+                ))}
             </ul>
-            <p className="muted small">You can change levels later from Live documents.</p>
             <div className="foot-actions">
               <button className="btn-secondary" onClick={() => setConfirming(false)} disabled={busy}>
                 Back to review

@@ -1,5 +1,8 @@
 # Design Decisions
 
+> **2026-11-25 — access model replaced.** Sections 3, 4 and 11 (client/team/management levels and
+> per-document grants) are superseded by **§12 Topic-based access**. They're kept for history.
+
 Agreed during the design review on 2026-11-24. Each decision lists the reason, so it can be revisited
 deliberately rather than drifted away from.
 
@@ -166,6 +169,24 @@ Implementation notes:
 - `visibility_changes` records every level set at publish, live edit and restore.
 - Parsing and embedding run as separate worker loops (in the API process in dev, or
   `python -m app.worker`).
+
+## 12. Topic-based access — agreed 2026-11-25
+
+| # | Topic | Decision |
+|---|-------|----------|
+| 1 | Who decides access | Fixed rules: role × document type × topic. Sections auto-tagged by heading keyword; the uploader only checks tags |
+| 2 | Topics | BRD: details, context, goals, requirements, business rules, planning, risks, governance. PRD: details, overview, scope, requirements, delivery. Proposal: details, summary, scope, timeline, engagement, completion. All: commercial, unclassified |
+| 3 | Prices | Currency amount + money word → moved into a Commercial section (labelled with its sub-heading) |
+| 4 | Refusals | Own project, forbidden topic → the rule is explained. Other project → neutral sentence |
+| 5 | Reset | Backup, then all content removed; only BRD/PRD/Proposal; P001 Droob AI, P002 Hub Drives; Finance is a project member |
+| 6 | Teams | CEO: projects, PMs, roles. PM: members of own projects. Last PM protected. Audited |
+| 7 | Data | `topics`, `topic_headings`, `role_topic_access`; `topic` + generated `access_key` on chunks; index `(company_id, project_id, access_key)`; `membership_changes`; levels and grants dropped |
+| 8 | Unmatched headings | *unclassified* (CEO/PM only); never widened by a guess |
+| 9 | Review | Publish blocked while anything is unclassified; Review requests for the project's PMs and the CEO; cover blocks → Document details |
+| 10 | Failures | Live topic fixes audited; rule changes need no re-processing; optimistic lock between reviewers; permission re-check at publish |
+
+Measured on the real Droob AI BRD, PRD and Proposal PDFs: 48 sections, 46 tagged correctly by
+heading, 2 cover blocks sent to review; every "Investment" line split out of the delivery plans.
 
 ## Relevance threshold (measured 2026-11-24)
 
