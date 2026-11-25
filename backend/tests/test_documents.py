@@ -88,3 +88,10 @@ def test_split_lines_keep_their_sub_heading():
     assert out[1] == ("Commercial details — from 4. Project Delivery Plans", "commercial",
                       "Plan 1 — Foundation: Investment: $1,000\nPlan 2 — AI: Investment: $1,000")
     assert "$" not in out[0][2] and "### Plan 2 — AI" in out[0][2]
+
+
+def test_only_the_price_sentence_moves_when_a_line_has_several():
+    out = split_commercial([("1. Executive Summary", "summary",
+                             "We build the store in three plans. Total Project Investment: $18,000 USD. Launch is in Q4.")])
+    assert out[0] == ("1. Executive Summary", "summary", "We build the store in three plans. Launch is in Q4.")
+    assert out[1][2] == "Total Project Investment: $18,000 USD."

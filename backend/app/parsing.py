@@ -337,7 +337,7 @@ def _pdf_blocks(page_lines, page_tables, body: float) -> list[_Block]:
             text = l["text"]
             starts_item = bool(re.match(r"^([•▪◦\-–*]|\d+[.)])\s", text))
             gap = (l["top"] - last_bottom) if last_bottom is not None else 0
-            if starts_item or gap > l["size"] * 0.9:
+            if starts_item or gap > l["size"] * 0.5:      # paragraph spacing; line spacing is ~0.2× size
                 flush()
             if starts_item:
                 text = "- " + re.sub(r"^[•▪◦\-–*]\s*", "", text)

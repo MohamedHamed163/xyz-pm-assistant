@@ -129,11 +129,18 @@ def split_commercial(sections: list[tuple[str, str, str]]) -> list[tuple[str, st
         for line in content.splitlines():
             if line.startswith("### "):
                 subheading = line[4:].strip()
-            if line.strip() and is_money_line(line):
-                # Keep the context so "Investment: $1,000" still says which plan it belongs to.
-                moved.append(f"{subheading}: {line.strip()}" if subheading else line)
-            else:
+            if not (line.strip() and is_money_line(line)):
                 kept.append(line)
+                continue
+            # Several sentences on one line: move only the ones with a price, keep the rest in place.
+            sentences = re.split(r"(?<=[.!?])\s+", line.strip())
+            money = [s for s in sentences if is_money_line(s)] if len(sentences) > 1 else [line.strip()]
+            rest = [s for s in sentences if s not in money] if len(sentences) > 1 else []
+            if rest:
+                kept.append(" ".join(rest))
+            for s in money or [line.strip()]:
+                # Keep the context so "Investment: $1,000" still says which plan it belongs to.
+                moved.append(f"{subheading}: {s}" if subheading else s)
         remaining = "\n".join(kept).strip()
         if remaining:
             out.append((heading, topic, re.sub(r"\n{3,}", "\n\n", remaining)))

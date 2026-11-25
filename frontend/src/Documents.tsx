@@ -32,10 +32,12 @@ export default function Documents({ me, onBack }: { me: Me; onBack: () => void }
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
 
   const loadRequests = useCallback(() => api.reviewRequests().then((r) => setRequests(r.items)), []);
+  // Reload the project list whenever the Upload tab opens: a project created in the Team tab a moment
+  // ago must appear here, never silently fall back to another project.
   useEffect(() => {
-    api.uploadOptions().then(setOptions);
+    if (tab === "upload" || !options) api.uploadOptions().then(setOptions);
     loadRequests();
-  }, [loadRequests]);
+  }, [tab, loadRequests]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openReview(id: number) {
     setReviewing(await api.upload(id));
@@ -88,6 +90,7 @@ export default function Documents({ me, onBack }: { me: Me; onBack: () => void }
             )}
             {tab === "upload" && options && (
               <UploadForm
+                key={options.projects.map((p) => p.id).join(",")}
                 options={options}
                 onUploaded={(id) => {
                   setFlash("Uploaded — reading the file and tagging sections…");
@@ -122,7 +125,7 @@ function UploadForm({ options, onUploaded }: { options: UploadOptions; onUploade
   const [docs, setDocs] = useState<ManagedDocument[]>([]);
   const [mode, setMode] = useState<"new" | "version">("new");
   const [file, setFile] = useState<File | null>(null);
-  const [project, setProject] = useState(options.projects[0]?.id ?? "");
+  const [project, setProject] = useState(options.projects.length === 1 ? options.projects[0].id : "");
   const [docType, setDocType] = useState(options.doc_types[0]?.name ?? "");
   const [title, setTitle] = useState("");
   const [documentId, setDocumentId] = useState("");
@@ -208,7 +211,8 @@ function UploadForm({ options, onUploaded }: { options: UploadOptions; onUploade
         <div className="form-grid">
           <label>
             Project
-            <select value={project} onChange={(e) => setProject(e.target.value)}>
+            <select value={project} onChange={(e) => setProject(e.target.value)} required>
+              <option value="">Choose a project…</option>
               {options.projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.id} · {p.name}
@@ -252,7 +256,11 @@ function UploadForm({ options, onUploaded }: { options: UploadOptions; onUploade
         company's rules.
       </p>
       {error && <p className="error-text">{error}</p>}
-      <button className="btn-primary" type="submit" disabled={!file || busy || (mode === "version" && !documentId)}>
+      <button
+        className="btn-primary"
+        type="submit"
+        disabled={!file || busy || (mode === "version" ? !documentId : !project)}
+      >
         {busy ? "Uploading…" : "Upload and review"}
       </button>
     </form>
