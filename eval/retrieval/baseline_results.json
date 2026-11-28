@@ -1,0 +1,977 @@
+{
+ "questions": 62,
+ "answerable": 59,
+ "users": 16,
+ "offline-hashing": {
+  "relevance": {
+   "recall@1": 0.746,
+   "recall@3": 0.881,
+   "recall@8": 0.983,
+   "mrr": 0.831,
+   "context_completeness": 0.966,
+   "missed_at_8": [
+    "q50"
+   ]
+  },
+  "permissions": {
+   "fact_checks": 944,
+   "leaks": 72,
+   "leak_list": [
+    [
+     "u-p001-client",
+     "q01"
+    ],
+    [
+     "u-p001-finance",
+     "q02"
+    ],
+    [
+     "u-p001-client",
+     "q02"
+    ],
+    [
+     "u-p001-client",
+     "q03"
+    ],
+    [
+     "u-p001-finance",
+     "q04"
+    ],
+    [
+     "u-p001-client",
+     "q04"
+    ],
+    [
+     "u-p001-developer",
+     "q05"
+    ],
+    [
+     "u-p001-client",
+     "q05"
+    ],
+    [
+     "u-p001-client",
+     "q06"
+    ],
+    [
+     "u-p001-client",
+     "q07"
+    ],
+    [
+     "u-p001-finance",
+     "q08"
+    ],
+    [
+     "u-p001-client",
+     "q08"
+    ],
+    [
+     "u-p001-client",
+     "q09"
+    ],
+    [
+     "u-p001-client",
+     "q10"
+    ],
+    [
+     "u-p001-client",
+     "q11"
+    ],
+    [
+     "u-p001-client",
+     "q14"
+    ],
+    [
+     "u-p001-developer",
+     "q16"
+    ],
+    [
+     "u-p001-qa",
+     "q16"
+    ],
+    [
+     "u-p001-client",
+     "q16"
+    ],
+    [
+     "u-p001-developer",
+     "q17"
+    ],
+    [
+     "u-p001-client",
+     "q17"
+    ],
+    [
+     "u-p001-client",
+     "q18"
+    ],
+    [
+     "u-p001-client",
+     "q19"
+    ],
+    [
+     "u-p001-pm",
+     "q21"
+    ],
+    [
+     "u-p001-client",
+     "q21"
+    ],
+    [
+     "u-p002-client",
+     "q22"
+    ],
+    [
+     "u-p002-client",
+     "q23"
+    ],
+    [
+     "u-p002-client",
+     "q24"
+    ],
+    [
+     "u-p002-client",
+     "q25"
+    ],
+    [
+     "u-p002-finance",
+     "q27"
+    ],
+    [
+     "u-p002-client",
+     "q27"
+    ],
+    [
+     "u-p002-client",
+     "q28"
+    ],
+    [
+     "u-p002-finance",
+     "q30"
+    ],
+    [
+     "u-p002-client",
+     "q30"
+    ],
+    [
+     "u-p002-client",
+     "q32"
+    ],
+    [
+     "u-p002-client",
+     "q33"
+    ],
+    [
+     "u-p002-client",
+     "q34"
+    ],
+    [
+     "u-p002-developer",
+     "q35"
+    ],
+    [
+     "u-p002-qa",
+     "q35"
+    ],
+    [
+     "u-p002-client",
+     "q35"
+    ],
+    [
+     "u-p002-developer",
+     "q36"
+    ],
+    [
+     "u-p002-qa",
+     "q36"
+    ],
+    [
+     "u-p002-client",
+     "q36"
+    ],
+    [
+     "u-p002-developer",
+     "q37"
+    ],
+    [
+     "u-p002-client",
+     "q37"
+    ],
+    [
+     "u-p002-client",
+     "q38"
+    ],
+    [
+     "u-p002-client",
+     "q39"
+    ],
+    [
+     "u-p002-pm",
+     "q40"
+    ],
+    [
+     "u-p002-pm",
+     "q41"
+    ],
+    [
+     "u-p003-client",
+     "q43"
+    ],
+    [
+     "u-p003-client",
+     "q44"
+    ],
+    [
+     "u-p003-client",
+     "q45"
+    ],
+    [
+     "u-p003-finance",
+     "q49"
+    ],
+    [
+     "u-p003-client",
+     "q49"
+    ],
+    [
+     "u-p003-client",
+     "q51"
+    ],
+    [
+     "u-p003-finance",
+     "q52"
+    ],
+    [
+     "u-p003-client",
+     "q52"
+    ],
+    [
+     "u-p003-developer",
+     "q53"
+    ],
+    [
+     "u-p003-qa",
+     "q53"
+    ],
+    [
+     "u-p003-client",
+     "q53"
+    ],
+    [
+     "u-p003-developer",
+     "q54"
+    ],
+    [
+     "u-p003-qa",
+     "q54"
+    ],
+    [
+     "u-p003-client",
+     "q54"
+    ],
+    [
+     "u-p003-developer",
+     "q55"
+    ],
+    [
+     "u-p003-client",
+     "q55"
+    ],
+    [
+     "u-p003-client",
+     "q56"
+    ],
+    [
+     "u-p003-pm",
+     "q57"
+    ],
+    [
+     "u-p003-pm",
+     "q58"
+    ],
+    [
+     "u-p003-developer",
+     "q58"
+    ],
+    [
+     "u-p003-qa",
+     "q58"
+    ],
+    [
+     "u-p003-client",
+     "q58"
+    ],
+    [
+     "u-p001-client",
+     "q59"
+    ]
+   ],
+   "over_blocks": 23,
+   "over_block_rate": 0.12,
+   "unauthorized_rate_top8": 0.4106,
+   "unauthorized_chunks": 3157,
+   "chunks_seen": 7688,
+   "unauthorized_examples": [
+    [
+     "u-p001-pm",
+     "q16",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q16",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q18",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q18",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q19",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q20",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q21",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q21",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q22",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q26",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q34",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q35",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q35",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q36",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q36",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ]
+   ],
+   "authorized_recall_at8": 0.838
+  },
+  "seconds": 2.2
+ },
+ "openai-3-small": {
+  "relevance": {
+   "recall@1": 0.797,
+   "recall@3": 0.932,
+   "recall@8": 0.983,
+   "mrr": 0.868,
+   "context_completeness": 0.983,
+   "missed_at_8": [
+    "q47"
+   ]
+  },
+  "permissions": {
+   "fact_checks": 944,
+   "leaks": 72,
+   "leak_list": [
+    [
+     "u-p001-client",
+     "q01"
+    ],
+    [
+     "u-p001-finance",
+     "q02"
+    ],
+    [
+     "u-p001-client",
+     "q02"
+    ],
+    [
+     "u-p001-client",
+     "q03"
+    ],
+    [
+     "u-p001-finance",
+     "q04"
+    ],
+    [
+     "u-p001-client",
+     "q04"
+    ],
+    [
+     "u-p001-developer",
+     "q05"
+    ],
+    [
+     "u-p001-client",
+     "q05"
+    ],
+    [
+     "u-p001-client",
+     "q06"
+    ],
+    [
+     "u-p001-client",
+     "q07"
+    ],
+    [
+     "u-p001-finance",
+     "q08"
+    ],
+    [
+     "u-p001-client",
+     "q08"
+    ],
+    [
+     "u-p001-client",
+     "q09"
+    ],
+    [
+     "u-p001-client",
+     "q10"
+    ],
+    [
+     "u-p001-client",
+     "q11"
+    ],
+    [
+     "u-p001-client",
+     "q14"
+    ],
+    [
+     "u-p001-developer",
+     "q16"
+    ],
+    [
+     "u-p001-qa",
+     "q16"
+    ],
+    [
+     "u-p001-client",
+     "q16"
+    ],
+    [
+     "u-p001-developer",
+     "q17"
+    ],
+    [
+     "u-p001-client",
+     "q17"
+    ],
+    [
+     "u-p001-client",
+     "q18"
+    ],
+    [
+     "u-p001-client",
+     "q19"
+    ],
+    [
+     "u-p001-pm",
+     "q21"
+    ],
+    [
+     "u-p001-client",
+     "q21"
+    ],
+    [
+     "u-p002-client",
+     "q22"
+    ],
+    [
+     "u-p002-client",
+     "q23"
+    ],
+    [
+     "u-p002-client",
+     "q24"
+    ],
+    [
+     "u-p002-client",
+     "q25"
+    ],
+    [
+     "u-p002-finance",
+     "q27"
+    ],
+    [
+     "u-p002-client",
+     "q27"
+    ],
+    [
+     "u-p002-client",
+     "q28"
+    ],
+    [
+     "u-p002-finance",
+     "q30"
+    ],
+    [
+     "u-p002-client",
+     "q30"
+    ],
+    [
+     "u-p002-client",
+     "q32"
+    ],
+    [
+     "u-p002-client",
+     "q33"
+    ],
+    [
+     "u-p002-client",
+     "q34"
+    ],
+    [
+     "u-p002-developer",
+     "q35"
+    ],
+    [
+     "u-p002-qa",
+     "q35"
+    ],
+    [
+     "u-p002-client",
+     "q35"
+    ],
+    [
+     "u-p002-developer",
+     "q36"
+    ],
+    [
+     "u-p002-qa",
+     "q36"
+    ],
+    [
+     "u-p002-client",
+     "q36"
+    ],
+    [
+     "u-p002-developer",
+     "q37"
+    ],
+    [
+     "u-p002-client",
+     "q37"
+    ],
+    [
+     "u-p002-client",
+     "q38"
+    ],
+    [
+     "u-p002-client",
+     "q39"
+    ],
+    [
+     "u-p002-pm",
+     "q40"
+    ],
+    [
+     "u-p002-pm",
+     "q41"
+    ],
+    [
+     "u-p003-client",
+     "q43"
+    ],
+    [
+     "u-p003-client",
+     "q44"
+    ],
+    [
+     "u-p003-client",
+     "q45"
+    ],
+    [
+     "u-p003-finance",
+     "q49"
+    ],
+    [
+     "u-p003-client",
+     "q49"
+    ],
+    [
+     "u-p003-client",
+     "q51"
+    ],
+    [
+     "u-p003-finance",
+     "q52"
+    ],
+    [
+     "u-p003-client",
+     "q52"
+    ],
+    [
+     "u-p003-developer",
+     "q53"
+    ],
+    [
+     "u-p003-qa",
+     "q53"
+    ],
+    [
+     "u-p003-client",
+     "q53"
+    ],
+    [
+     "u-p003-developer",
+     "q54"
+    ],
+    [
+     "u-p003-qa",
+     "q54"
+    ],
+    [
+     "u-p003-client",
+     "q54"
+    ],
+    [
+     "u-p003-developer",
+     "q55"
+    ],
+    [
+     "u-p003-client",
+     "q55"
+    ],
+    [
+     "u-p003-client",
+     "q56"
+    ],
+    [
+     "u-p003-pm",
+     "q57"
+    ],
+    [
+     "u-p003-pm",
+     "q58"
+    ],
+    [
+     "u-p003-developer",
+     "q58"
+    ],
+    [
+     "u-p003-qa",
+     "q58"
+    ],
+    [
+     "u-p003-client",
+     "q58"
+    ],
+    [
+     "u-p001-client",
+     "q59"
+    ]
+   ],
+   "over_blocks": 23,
+   "over_block_rate": 0.12,
+   "unauthorized_rate_top8": 0.4079,
+   "unauthorized_chunks": 3136,
+   "chunks_seen": 7688,
+   "unauthorized_examples": [
+    [
+     "u-p001-pm",
+     "q10",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q15",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q15",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q16",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q16",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q18",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q18",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q19",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q19",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q20",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q21",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q21",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q33",
+     "proposal-p001-003",
+     "Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q33",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ],
+    [
+     "u-p001-pm",
+     "q35",
+     "proposal-p001-003",
+     "Commercial details \u2014 from Confidential Note"
+    ]
+   ],
+   "authorized_recall_at8": 0.843
+  },
+  "answers": {
+   "ceo": {
+    "answer_accuracy": 0.983,
+    "not_found_correct": "3/3",
+    "citation_precision": 0.873,
+    "wrong": [
+     [
+      "q47",
+      "answered",
+      "The features in Hub Drives include a guest marketplace, provider listing management, booking and payment flow, an operations dashboard, and QA, deployment, and "
+     ]
+    ]
+   },
+   "p001": {
+    "denied_pairs": 60,
+    "answer_leaks": 28,
+    "leak_list": [
+     [
+      "u-p001-qa",
+      "q01",
+      "The e-commerce business wants to launch an e-commerce platform that includes a catalog, cart, checkout, order history, o"
+     ],
+     [
+      "u-p001-finance",
+      "q01",
+      "The e-commerce business wants to launch an e-commerce platform that includes a catalog, cart, checkout, order history, o"
+     ],
+     [
+      "u-p001-client",
+      "q01",
+      "The e-commerce business wants to launch an online store that supports product discovery, checkout, payment, and order tr"
+     ],
+     [
+      "u-p001-finance",
+      "q02",
+      "The business objectives of the E-Commerce platform are to increase online conversion and reduce checkout abandonment, pr"
+     ],
+     [
+      "u-p001-client",
+      "q02",
+      "The business objectives of the E-Commerce platform are to increase online conversion and reduce checkout abandonment, pr"
+     ],
+     [
+      "u-p001-client",
+      "q03",
+      "BR-02 in the E-Commerce Business Requirements Document (BRD) states that customers can check out using supported payment"
+     ],
+     [
+      "u-p001-finance",
+      "q04",
+      "Yes, operations staff are given tools to manage orders, which implies they can update order status in the e-commerce sto"
+     ],
+     [
+      "u-p001-client",
+      "q04",
+      "Yes, operations staff can update order status in the e-commerce store. This is specified in the business requirements (B"
+     ],
+     [
+      "u-p001-developer",
+      "q05",
+      "The launch target timeline for the E-Commerce platform is 12 weeks, which includes 2 weeks for discovery, 2 weeks for de"
+     ],
+     [
+      "u-p001-client",
+      "q05",
+      "The launch target for the E-Commerce platform is 12 weeks, with the initial release limited to one country."
+     ],
+     [
+      "u-p001-client",
+      "q06",
+      "Yes, the first e-commerce release is limited to one country."
+     ],
+     [
+      "u-p001-client",
+      "q07",
+      "The stakeholders of the E-Commerce Business Requirements Document (BRD) are Business Sponsor, Product Manager, Engineeri"
+     ],
+     [
+      "u-p001-finance",
+      "q08",
+      "The scope for the E-Commerce product includes catalog, cart, checkout, order history, order tracking, and admin order ma"
+     ],
+     [
+      "u-p001-client",
+      "q08",
+      "The scope for the E-Commerce product includes catalog, cart, checkout, order history, order tracking, and admin order ma"
+     ],
+     [
+      "u-p001-client",
+      "q09",
+      "User story US-02 in the E-Commerce PRD states: \"As a shopper, I want to pay securely so I can complete an order.\""
+     ],
+     [
+      "u-p001-client",
+      "q10",
+      "An e-commerce payment confirmation is recorded only after provider confirmation."
+     ],
+     [
+      "u-p001-client",
+      "q11",
+      "Yes, operations status changes in the e-commerce platform are audit logged."
+     ],
+     [
+      "u-p001-client",
+      "q14",
+      "The e-commerce user story that covers searching products is US-01: \"As a shopper, I want to search products so I can fin"
+     ],
+     [
+      "u-p001-developer",
+      "q16",
+      "The deliverables of the E-Commerce proposal are UX/UI design, web application, payment integration, and QA and deploymen"
+     ],
+     [
+      "u-p001-qa",
+      "q16",
+      "The deliverables of the E-Commerce proposal are UX/UI design, web application, payment integration, and QA and deploymen"
+     ],
+     [
+      "u-p001-client",
+      "q16",
+      "The deliverables of the E-Commerce proposal are:\n- UX/UI design\n- Web application\n- Payment integration\n- QA and deploym"
+     ],
+     [
+      "u-p001-developer",
+      "q17",
+      "The E-Commerce timeline is split into four phases over 12 weeks: discovery (2 weeks), design (2 weeks), build (6 weeks),"
+     ],
+     [
+      "u-p001-client",
+      "q17",
+      "The E-Commerce timeline is split into four phases over 12 weeks: discovery (2 weeks), design (2 weeks), build (6 weeks),"
+     ],
+     [
+      "u-p001-client",
+      "q18",
+      "The total price of the E-Commerce proposal is USD 24,000, with payment terms of 30% at kickoff, 40% on beta, and 30% on "
+     ],
+     [
+      "u-p001-client",
+      "q19",
+      "The payment schedule for the E-Commerce proposal is 30% at kickoff, 40% on beta, and 30% on acceptance, with a total ill"
+     ],
+     [
+      "u-p001-pm",
+      "q21",
+      "The internal estimated delivery cost for the E-Commerce project is USD 15,000."
+     ],
+     [
+      "u-p001-client",
+      "q21",
+      "The internal estimated delivery cost for the E-Commerce project is USD 15,000."
+     ],
+     [
+      "u-p001-client",
+      "q59",
+      "The E-Commerce user story that matches business requirement BR-03 (Operations staff can view and update order status) is"
+     ]
+    ],
+    "allowed_pairs": 50,
+    "allowed_answered_correctly": 0.88
+   }
+  },
+  "seconds": 609.1
+ }
+}

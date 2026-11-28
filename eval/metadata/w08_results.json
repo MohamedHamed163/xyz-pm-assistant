@@ -1,0 +1,918 @@
+{
+ "access_ceiling": {
+  "deterministic": {
+   "runs": 40,
+   "exact": 37,
+   "wider_than_label": [
+    [
+     "H1-synonyms",
+     "heldout",
+     [
+      "ceo"
+     ]
+    ],
+    [
+     "H2-table-other-keys",
+     "heldout",
+     [
+      "client",
+      "developer",
+      "operations",
+      "pm",
+      "qa"
+     ]
+    ],
+    [
+     "H4-prose-header",
+     "heldout",
+     [
+      "client",
+      "developer",
+      "finance",
+      "legal",
+      "operations"
+     ]
+    ]
+   ],
+   "narrower_than_label": []
+  },
+  "llm": {
+   "runs": 40,
+   "exact": 36,
+   "wider_than_label": [],
+   "narrower_than_label": [
+    [
+     "typo-classification",
+     "plain",
+     [
+      "pm"
+     ]
+    ],
+    [
+     "missing-roles",
+     "markdown",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ],
+    [
+     "missing-roles",
+     "plain",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ],
+    [
+     "missing-roles",
+     "table",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ]
+   ]
+  },
+  "hybrid": {
+   "runs": 40,
+   "exact": 37,
+   "wider_than_label": [
+    [
+     "H1-synonyms",
+     "heldout",
+     [
+      "ceo"
+     ]
+    ],
+    [
+     "H2-table-other-keys",
+     "heldout",
+     [
+      "client",
+      "developer",
+      "operations",
+      "pm",
+      "qa"
+     ]
+    ],
+    [
+     "H4-prose-header",
+     "heldout",
+     [
+      "client",
+      "developer",
+      "finance",
+      "legal",
+      "operations"
+     ]
+    ]
+   ],
+   "narrower_than_label": []
+  },
+  "stricter-of-both": {
+   "runs": 40,
+   "exact": 36,
+   "wider_than_label": [],
+   "narrower_than_label": [
+    [
+     "typo-classification",
+     "plain",
+     [
+      "pm"
+     ]
+    ],
+    [
+     "missing-roles",
+     "markdown",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ],
+    [
+     "missing-roles",
+     "plain",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ],
+    [
+     "missing-roles",
+     "table",
+     [
+      "developer",
+      "finance",
+      "legal",
+      "operations",
+      "qa"
+     ]
+    ]
+   ]
+  }
+ },
+ "cases": 16,
+ "renderings": 3,
+ "overall_accuracy": {
+  "deterministic": 0.9679633867276888,
+  "llm": 0.9405034324942791,
+  "hybrid": 0.9588100686498856
+ },
+ "per_field": {
+  "deterministic": {
+   "markdown": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "11/11",
+    "needs_review_note": "12/12"
+   },
+   "plain": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "11/11",
+    "needs_review_note": "12/12"
+   },
+   "table": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "11/11",
+    "needs_review_note": "12/12"
+   },
+   "heldout": {
+    "document_id": "2/4",
+    "project_id": "3/4",
+    "project_name": "3/4",
+    "document_type": "2/4",
+    "classification": "2/4",
+    "owner": "2/4",
+    "authorized_roles": "1/4",
+    "unknown_roles": "4/4",
+    "has_role_qualifier": "4/4",
+    "restricts_money": "4/4",
+    "needs_review_note": "3/4"
+   }
+  },
+  "llm": {
+   "markdown": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "10/12",
+    "unknown_roles": "10/12",
+    "has_role_qualifier": "10/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "plain": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "9/12",
+    "unknown_roles": "9/12",
+    "has_role_qualifier": "10/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "table": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "10/12",
+    "unknown_roles": "10/12",
+    "has_role_qualifier": "10/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "heldout": {
+    "document_id": "4/4",
+    "project_id": "4/4",
+    "project_name": "4/4",
+    "document_type": "4/4",
+    "classification": "4/4",
+    "owner": "4/4",
+    "authorized_roles": "4/4",
+    "unknown_roles": "3/4",
+    "has_role_qualifier": "4/4",
+    "restricts_money": "3/4",
+    "needs_review_note": "3/4"
+   }
+  },
+  "hybrid": {
+   "markdown": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "plain": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "table": {
+    "document_id": "12/12",
+    "project_id": "12/12",
+    "project_name": "12/12",
+    "document_type": "12/12",
+    "classification": "12/12",
+    "owner": "12/12",
+    "authorized_roles": "12/12",
+    "unknown_roles": "12/12",
+    "has_role_qualifier": "12/12",
+    "restricts_money": "10/11",
+    "needs_review_note": "12/12"
+   },
+   "heldout": {
+    "document_id": "2/4",
+    "project_id": "3/4",
+    "project_name": "3/4",
+    "document_type": "2/4",
+    "classification": "2/4",
+    "owner": "2/4",
+    "authorized_roles": "1/4",
+    "unknown_roles": "4/4",
+    "has_role_qualifier": "4/4",
+    "restricts_money": "3/4",
+    "needs_review_note": "3/4"
+   }
+  }
+ },
+ "misses": [
+  {
+   "case": "BRD-P001-001",
+   "style": "markdown",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "client",
+    "developer",
+    "pm",
+    "qa"
+   ],
+   "want": [
+    "ceo",
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "BRD-P001-001",
+   "style": "plain",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "client",
+    "developer",
+    "pm",
+    "qa"
+   ],
+   "want": [
+    "ceo",
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "BRD-P001-001",
+   "style": "table",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "client",
+    "developer",
+    "pm",
+    "qa"
+   ],
+   "want": [
+    "ceo",
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "BRD-P002-004",
+   "style": "markdown",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "instructor",
+    "student"
+   ],
+   "want": [
+    "instructor"
+   ]
+  },
+  {
+   "case": "BRD-P002-004",
+   "style": "plain",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "instructor",
+    "student"
+   ],
+   "want": [
+    "instructor"
+   ]
+  },
+  {
+   "case": "BRD-P002-004",
+   "style": "table",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "instructor",
+    "student"
+   ],
+   "want": [
+    "instructor"
+   ]
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "markdown",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "markdown",
+   "method": "llm",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "markdown",
+   "method": "hybrid",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "plain",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "plain",
+   "method": "llm",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "plain",
+   "method": "hybrid",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "table",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "table",
+   "method": "llm",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "PRD-P002-005",
+   "style": "table",
+   "method": "hybrid",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "typo-classification",
+   "style": "plain",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "developer",
+    "qa"
+   ],
+   "want": [
+    "ceo",
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "typo-classification",
+   "style": "plain",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "project manager"
+   ],
+   "want": []
+  },
+  {
+   "case": "missing-roles",
+   "style": "markdown",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "pm"
+   ],
+   "want": null
+  },
+  {
+   "case": "missing-roles",
+   "style": "markdown",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "project team"
+   ],
+   "want": []
+  },
+  {
+   "case": "missing-roles",
+   "style": "markdown",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "missing-roles",
+   "style": "plain",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "pm"
+   ],
+   "want": null
+  },
+  {
+   "case": "missing-roles",
+   "style": "plain",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "project team"
+   ],
+   "want": []
+  },
+  {
+   "case": "missing-roles",
+   "style": "plain",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "missing-roles",
+   "style": "table",
+   "method": "llm",
+   "field": "authorized_roles",
+   "got": [
+    "ceo",
+    "pm"
+   ],
+   "want": null
+  },
+  {
+   "case": "missing-roles",
+   "style": "table",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "project team"
+   ],
+   "want": []
+  },
+  {
+   "case": "missing-roles",
+   "style": "table",
+   "method": "llm",
+   "field": "has_role_qualifier",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "H1-synonyms",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "owner",
+   "got": null,
+   "want": "Head of Product"
+  },
+  {
+   "case": "H1-synonyms",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "H1-synonyms",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "owner",
+   "got": null,
+   "want": "Head of Product"
+  },
+  {
+   "case": "H1-synonyms",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "developer",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "document_id",
+   "got": null,
+   "want": "Proposal-P011-301"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "document_type",
+   "got": null,
+   "want": "proposal"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "classification",
+   "got": "missing",
+   "want": "commercial_confidential"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "ceo",
+    "finance",
+    "legal"
+   ]
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "needs_review_note",
+   "got": false,
+   "want": true
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "llm",
+   "field": "unknown_roles",
+   "got": [
+    "counsel",
+    "manager"
+   ],
+   "want": []
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "llm",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "document_id",
+   "got": null,
+   "want": "Proposal-P011-301"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "document_type",
+   "got": null,
+   "want": "proposal"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "classification",
+   "got": "missing",
+   "want": "commercial_confidential"
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "ceo",
+    "finance",
+    "legal"
+   ]
+  },
+  {
+   "case": "H2-table-other-keys",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "restricts_money",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "H3-unknown-level-and-role",
+   "style": "heldout",
+   "method": "llm",
+   "field": "needs_review_note",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "H3-unknown-level-and-role",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "needs_review_note",
+   "got": true,
+   "want": false
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "document_id",
+   "got": null,
+   "want": "BRD-P010-201"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "project_id",
+   "got": null,
+   "want": "P010"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "project_name",
+   "got": null,
+   "want": "Fleet Tracker"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "document_type",
+   "got": null,
+   "want": "brd"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "classification",
+   "got": "missing",
+   "want": "internal"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "owner",
+   "got": null,
+   "want": "Operations Lead"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "deterministic",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "ceo",
+    "pm",
+    "qa"
+   ]
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "document_id",
+   "got": null,
+   "want": "BRD-P010-201"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "project_id",
+   "got": null,
+   "want": "P010"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "project_name",
+   "got": null,
+   "want": "Fleet Tracker"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "document_type",
+   "got": null,
+   "want": "brd"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "classification",
+   "got": "missing",
+   "want": "internal"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "owner",
+   "got": null,
+   "want": "Operations Lead"
+  },
+  {
+   "case": "H4-prose-header",
+   "style": "heldout",
+   "method": "hybrid",
+   "field": "authorized_roles",
+   "got": null,
+   "want": [
+    "ceo",
+    "pm",
+    "qa"
+   ]
+  }
+ ],
+ "llm_usage": {
+  "prompt_tokens": 24681,
+  "completion_tokens": 3917
+ },
+ "llm_cost_usd": 0.0161,
+ "seconds": {
+  "deterministic": 0.012722873594611883,
+  "llm": 85.16457179468125,
+  "hybrid": 0.0
+ }
+}
